@@ -70,10 +70,10 @@ NLPvs is a WIP student project aimed to parse a large ammount of text from PDF f
   <li><a href=https://www.nltk.org/book/ch06.html/>Text classification with NLTK</a></li>
   <li><a href=https://huggingface.co/transformers/usage.html>Huggingface's Tranformer possible usages</a></li>
   <li><a href=https://ngc.nvidia.com/catalog/containers/nvidia:pytorch>Pytorch distro from NVIDIA NGC</a></li>
-  <li><a href=https://github.com/getalp/Flaubert></a>FlauBERT GitHub repository</li>
-  <li><a href=https://camembert-model.fr/></a>CamemBERT website</li>
-  <li><a href=https://github.com/adashofdata/nlp-in-python-tutorial/></a>NLP with Python - Ipython Notebooks</li>
-  <li><a href=https://www.youtube.com/watch?v=xvqsFTUsOmc></a>Conference : NLP in Python</li>
+  <li><a href=https://github.com/getalp/Flaubert>FlauBERT GitHub repository</a></li>
+  <li><a href=https://camembert-model.fr/>CamemBERT website</a></li>
+  <li><a href=https://github.com/adashofdata/nlp-in-python-tutorial/>NLP with Python - Ipython Notebooks</a></li>
+  <li><a href=https://www.youtube.com/watch?v=xvqsFTUsOmc>Conference : NLP in Python</a></li>
 </ul>
 
 # Additional Notes
