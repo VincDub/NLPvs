@@ -30,7 +30,7 @@ NLPvs is a WIP student project aimed to parse a large ammount of text from PDF f
   <li><a href=https://pandas.pydata.org/>Pandas</a>, used to create dataframes(tables) from the extracted data</li>
   <li><a href=https://github.com/pdfminer/pdfminer.six#pdfminersix>PDFMiner.six</a>, a PDF parsing library</li>
   <li>a folder in the same directory as the source code to dump all the PDF files to process (either call it <code>PDF</code> or change the name in the source code to whatever name you wish)</li>
-  <li>Some PDF files (oviously with text in them)</li>
+  <li>Some PDF files (obviously with text in them)</li>
 </ul>
 
 <h3>Optional</h3>
