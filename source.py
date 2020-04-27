@@ -7,6 +7,13 @@ import unicodedata
 import re
 import string
 import time
+import matplotlib.pyplot as plt
+import joblib
+import sys
+import os
+from tkinter import *
+from tkinter import filedialog
+from datetime import date
 
 #import tensorflow as tf
 #from tensorflow import keras
@@ -162,18 +169,19 @@ def preprocess_pdf_masse(dir):
 
     return pdf_df, delta_t
 ''' 
+
 def sac_de_mots(txt):
 
     sac_de_mots = list()
 
     for texte in txt:
 
-        sac_de_mots.append(vectoriser_entrainer_grp(texte))
+        sac_de_mots.append(sac_de_mots_grp(texte))
 
     return sac_de_mots
 
 
-def vectoriser_entrainer_grp(txt):
+def sac_de_mots_grp(txt):
 
     txt_grp = ""
 
@@ -185,27 +193,84 @@ def vectoriser_entrainer_grp(txt):
 
 
 
-def vectoriser_entrainer(dir_src,n):
+def vectoriser_vrac(dir_src):
 
-    sac = sac_de_mots(preprocess_pdf_masse(dir_src)[1])
+    preprocess = preprocess_pdf_masse(dir_src)
+
+    sac = sac_de_mots(preprocess[1])
 
     tfconv = TfidfVectorizer(input = 'content',max_features = 1000,ngram_range=(1,3),preprocessor=None,lowercase=False, tokenizer=None)
     tfidf = tfconv.fit_transform(sac)
 
-    kmeans = KMeans(n_clusters=n).fit(tfidf)
+    return tfidf
 
-    return kmeans, tfconv
+def vectoriser_avec_noms(dir_src):
+
+    preprocess = preprocess_pdf_masse(dir_src)
+
+    tfconv = TfidfVectorizer(input = 'content',max_features = 1000,ngram_range=(1,3),preprocessor=None,lowercase=False, tokenizer=None)
+
+    noms = preprocess[0]
+    textes_vec = list()
+
+    sac = sac_de_mots(preprocess[1])
+
+    textes_vec.append(tfconv.fit_transform(sac))
+
+    return noms, textes_vec
 
 
-def tester_texte(dir_src,dir_test,n):
+
+def entrainer_depuis_corpus(dir_src,n):
+
+    corpus_vect = vectoriser_vrac(dir_src)
+
+    modele_custom = KMeans(n_clusters=n).fit(corpus_vect)
+
+    joblib.dump(modele_custom,('MODEL/custom/model_'+ str(date.today()) +'.sav'))
+
+    return modele_custom
+
+
+def tester_texte(dir_src,dir_test,n,entrainer,dir_model):
 
     t_0 = time.time()
 
-    modele, vect = vectoriser_entrainer(dir_src,n)[0],vectoriser_entrainer(dir_src,n)[1]
+    if entrainer == False :
 
-    txt_test = sac_de_mots(preprocess_pdf_masse(dir_test)[1])
+        modele = joblib.load(dir_model)
 
-    resultat_class = modele.predict(vect.transform(txt_test))
+        txt_= vectoriser_avec_noms(dir_test)
+        txt_vec = txt_[1]
+        noms = txt_[0]
+
+        resultat_class = list()
+
+        for i in range (0,len(noms)):
+            
+            for texte in txt_vec:   
+            
+                resultat = modele.predict(texte)
+
+            resultat_class.append((noms[i],resultat[i]))
+
+    else:
+
+        modele = entrainer_depuis_corpus(dir_src,n)
+
+        txt_= vectoriser_avec_noms(dir_test)
+        txt_vec = txt_[1]
+        noms = txt_[0]
+
+        resultat_class = list()
+
+        for i in range (0,len(noms)):
+
+            for texte in txt_vec:
+            
+                resultat = modele.predict(texte)
+
+            resultat_class.append((noms[i],resultat[i]))
 
     t_1 = time.time()
 
@@ -213,4 +278,141 @@ def tester_texte(dir_src,dir_test,n):
 
     return resultat_class , delta_t
 
-print(tester_texte("PDF","TEST",4))
+
+def start(frame,bench,src,test,n,train,mdl):
+
+    dir_test = test.cget("text")
+    dir_mdl = mdl.cget("text")
+    n_cl = int()
+    dir_src = str()
+
+    if train == False:
+
+        result = tester_texte(dir_src,dir_test,n_cl,entrainer=False,dir_model=dir_mdl)
+        d = 0
+        result_bench = str(result[1])
+        bench["text"] = result_bench
+
+        for resultat in result[0]:
+
+            nom_indiv = str(resultat[0]).split('/')
+
+            result_txt = nom_indiv[-1] + ': cluster N° '+ str(resultat[1])
+
+            frame.create_text(0,(10+d),text=result_txt, fill='red', anchor=NW)
+            d += 20
+        
+    else:
+
+        n_cl = n.get()
+        dir_src = src.cget("text")
+
+        result = tester_texte(dir_src,dir_test,n_cl,entrainer=True,dir_model=dir_mdl)
+        d = 0
+        result_bench = str(result[1])
+        bench["text"] = result_bench
+
+        for resultat in result[0]:
+
+            nom_indiv = str(resultat[0]).split('/')
+
+            result_txt = nom_indiv[-1] + ': cluster N° '+ str(resultat[1])
+
+            frame.create_text(0,(10+d),text=result_txt, fill='red', anchor=NW)
+            d += 20
+
+def chemin_dossier_src(frame,r):
+    dossier_source = filedialog.askdirectory(title="Choisir un dossier de données d'entraînement")
+
+    r["text"] = str(dossier_source)
+
+def chemin_dossier_test(frame,r):
+    dossier_source = filedialog.askdirectory(title="Choisir un dossier de données à catégoriser")
+
+    r["text"] = str(dossier_source)
+
+
+def chemin_fichier(frame,r):
+    fichier_source = filedialog.askopenfilename(title="Choisir un modèle",filetypes=[('fichier sav','.sav')])
+
+    r["text"] = str(fichier_source)
+
+if os.environ.get('DISPLAY','') == '':
+    print('no display found. Using :0.0')
+    os.environ.__setitem__('DISPLAY', ':0.0')
+
+fen = Tk()
+fen.title("NLPvs beta")
+
+frame_input = Frame(fen, borderwidth = 3, relief = GROOVE)
+frame_input.pack(pady = 20)
+
+frame_output = Canvas(fen, borderwidth = 3, bg = 'white')
+frame_output.pack(side = RIGHT, pady = 20)
+
+bench = LabelFrame(fen,text = "Temps d'exécution",borderwidth = 3, relief = GROOVE)
+bench.pack()
+
+bench_txt = Label(bench, text="", bg='ivory')
+bench_txt.pack()
+
+#data à clusteriser
+
+dir_test = LabelFrame(frame_input, text='Dossier contenant les fichiers à classer', padx = 30, pady = 30)
+dir_test.pack(fill='both', expand = 'yes')
+
+btn_test = Button(dir_test,text='Sélectionner un dossier', command=(lambda : chemin_dossier_test(dir_test, r_test)))
+btn_test.pack()
+
+r_test = Label(dir_test, text = "", bg = 'ivory')
+r_test.pack(padx=20, pady=20)
+
+#selection du modele
+
+dir_mdl = LabelFrame(frame_input, text='Sélection du modèle de classification', padx = 30, pady = 30)
+dir_mdl.pack(fill='both', expand = 'yes')
+
+btn_mdl = Button(dir_mdl,text='Sélectionner un fichier', command=(lambda : chemin_fichier(dir_mdl, r_mdl)))
+btn_mdl.pack()
+
+r_mdl = Label(dir_mdl, text = "", bg = 'ivory')
+r_mdl.pack(padx=20, pady=20)
+
+#entrainement
+
+train = LabelFrame(frame_input, text='''Classification selon mon propre modèle''', padx = 30, pady = 30)
+train.pack(fill='both', expand = 'yes')
+#choix
+entrain = False
+
+train_true = Radiobutton(train, text="oui", variable=entrain, value=True)
+train_true.pack()
+train_false = Radiobutton(train, text="non", variable=entrain, value=False)
+train_false.pack()
+#nombre de clusters
+
+clusters = LabelFrame(train, text='Nombre de clusters', padx = 30, pady = 30)
+clusters.pack(fill='both', expand = 'yes')
+
+n_clusters = Spinbox(clusters, from_=2, to=50)
+n_clusters.pack()
+
+# data d'entraînement
+
+dir_src = LabelFrame(train, text='''Dossier contenant les fichiers d'entraînement (facultatif)''', padx = 30, pady = 30)
+dir_src.pack()
+
+btn_src = Button(dir_src,text='Sélectionner un dossier', command=(lambda :chemin_dossier_src(dir_src, r_src)))
+btn_src.pack()
+
+r_src = Label(dir_src, text = "", bg = 'ivory')
+r_src.pack(padx=20, pady=20)
+
+
+btn_start = Button(fen, text="Lancer la classification", command=(lambda: start(frame_output, bench_txt, r_src, r_test, n_clusters, train=entrain, mdl = r_mdl)))
+btn_start.pack(side = RIGHT, padx = 20, pady= 20)
+
+btn_quitter = Button(fen, text="Quitter", command=fen.quit)
+btn_quitter.pack(side = LEFT)
+
+fen.mainloop()
