@@ -97,6 +97,8 @@ NLPvs is a WIP student project aimed to parse a large ammount of text from PDF f
   <li><a href=https://scikit-learn.org/stable/modules/clustering.html#clustering>Scikit-learn : Clustering for ML (K-means explained)</a></li>
   <li><a href=https://medium.com/@MSalnikov/text-clustering-with-k-means-and-tf-idf-f099bcf95183>TF-IDF Explained and applied</a></li>
   <li><a href=https://medium.com/rapids-ai/combining-speed-scale-to-accelerate-k-means-in-rapids-cuml-8d45e5ce39f5>Accelerate K-means with CUDA using RAPIDS</a></li>
+  <li><a href=https://scikit-learn.org/stable/modules/model_persistence.html>Good advices to manage dumped models</a></li>
+  
 </ul>
 
 # Additional Notes
