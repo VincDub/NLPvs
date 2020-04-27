@@ -1,4 +1,4 @@
-# NLPvs (17/04/2020 Update)
+# NLPvs (27/04/2020 Update)
 
 <h2>About NLPvs</h2>
 
@@ -18,14 +18,17 @@ NLPvs is a WIP student project aimed to parse a large ammount of text from PDF f
   <li>K-means exploit function (using the K-means machine learning model to classify the refrence data into a given number of clusters) </li>
   <li>Model testing function (classify one or many other PDF docs located in a dedicated directory according to the previously defined clusters) </li>
   <li>Quick Benchmark technique (using the time library) </li>
+  <li>Added the option to either load a default trained model, or use a custom-made on from a dataset (which is automatically saved in the<code>MODELS/custom/</code> folder</li>
+  <li>Added a Graphical User Interface with Tkinter for a proper presentation of the user inputs and the results outputs (you can take a look at the screenshot below)</li>
 </ul>
 
+<img src="GUIv0.png"/>
 <img src="illustr.png"/>
 
 <h3>In progress</h3>
 
 <ul>
-  <li>Proper results printing (dataframe and graph)</li>
+  <li>integrate results in the GUI (dataframe and graph)</li>
   <li>Hapaxes-finding function</li>
 </ul>
 
@@ -39,15 +42,15 @@ NLPvs is a WIP student project aimed to parse a large ammount of text from PDF f
   <li><a href=https://pandas.pydata.org/>Pandas</a>, used to create dataframes(tables) from the extracted data</li>
   <li><a href=https://github.com/pdfminer/pdfminer.six#pdfminersix>PDFMiner.six</a>, a PDF parsing library</li>
   <li><a href=https://scikit-learn.org/stable/index.html>Scikit Learn</a>, Machine Learning Oriented API</li>
-  <li>a folder in the same directory as the source code to dump all the PDF files to use as reference data (either call it <code>PDF</code> or change the name in the source code to whatever name you wish)</li>
-  <li>another folder in the same directory as the source code to dump all the PDF files to classify (either call it <code>TEST</code> or change the name in the source code to whatever name you wish)</li>
-  <li>Some reference PDF files (to build the clusters from)</li>
+  <li>another folder in the same directory as the source code to dump all the PDF files to classify</li>
   <li>Some test PDF files (to test the classification)</li>
 </ul>
 
 <h3>Optional</h3>
 
 <ul>
+  <li>Some reference PDF files (to build the clusters from)</li>
+  <li>a folder in the same directory as the source code to dump all the PDF files to use as reference data</li>
   <li><a href=https://www.anaconda.com/>Anaconda</a>, an easy to setup Python developement platform</li> 
 </ul>
 
@@ -59,9 +62,8 @@ NLPvs is a WIP student project aimed to parse a large ammount of text from PDF f
   <li>Accelerate K-means on GPU with the use of RAPIDS</li>
   <li>Export a clustering graph to visualize the classification</li>
   <li>Extract features</li>
-  <li>Benchmark to compare execution between CPU and GPU</li>
+  <li>Benchmark to compare execution between CPU and GPU (add a button in the GUI)</li>
   <li>(Basic analysis such as nbr of words, lexical richness, hapaxes, etc... which doesn't rely on ML)</li>
-  <li>(make a quick GUI)</li>
   <li>(Find A LOT MORE PDF files to make a decent database)</li>
 </ul>
 
