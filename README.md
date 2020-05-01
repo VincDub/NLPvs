@@ -22,7 +22,7 @@ NLPvs is a WIP student project aimed to parse a large ammount of text from PDF f
   <li>Added a Graphical User Interface with Tkinter for a proper presentation of the user inputs and the results outputs (you can take a look at the screenshot below)</li>
 </ul>
 
-<img src="NLPvsGUIv1.png"/>
+<img src="GUIv1.png"/>
 <img src="illustr.png"/>
 
 <h3>In progress</h3>
