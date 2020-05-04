@@ -1,8 +1,10 @@
-# NLPvs (27/04/2020 Update)
+# NLPvs (04/05/2020 Update)
 
 <h2>About NLPvs</h2>
 
-NLPvs is a WIP student project aimed to parse a large ammount of text from PDF files. Although it has been imagined to crunch research-oriented documents written in French (such as thesis, etc...), its use could be easily extended to other fields.
+NLPvs is a WIP student project aimed to classify a large ammount of text from PDF files by using an unsupervised ML alforithm based on K-means. Although it has been imagined to crunch research-oriented documents written in French (such as thesis, etc...), its use could be easily extended to other fields.
+
+<img src="illustr.png"/>
 
 # Current Status 
 
@@ -10,9 +12,8 @@ NLPvs is a WIP student project aimed to parse a large ammount of text from PDF f
 
 <ul>
   <li>directory file-searching function (scans a given folder in the same directory as the source code to find all its files, their paths and will even search in subpaths)</li>
-  <li>cleaning lvl 1 function (remove non-unicode caracters and \n from the raw extracted text)</li>
-  <li>text to sentences division function (using NLTK)</li>
-  <li>sentence cleaning function (all in low_case, remove punctuation)</li>
+  <li>basic cleaning functions (remove non-unicode caracters and \n from the raw extracted text)</li>
+  <li>plein text cleaning function (all in low_case, remove punctuation)</li>
   <li>tokenization, stop-words removing and stemming function (divide each sentence into a list of words, in which we remove the useless words (meaning-wise) and truncate prefixes and suffixes to keep the root of the word)</li>
   <li>word vectorizing function (convert a group of words into a vector based on the most frequent words)</li>
   <li>K-means exploit function (using the K-means machine learning model to classify the refrence data into a given number of clusters) </li>
@@ -20,16 +21,23 @@ NLPvs is a WIP student project aimed to parse a large ammount of text from PDF f
   <li>Quick Benchmark technique (using the time library) </li>
   <li>Added the option to either load a default trained model, or use a custom-made on from a dataset (which is automatically saved in the<code>MODELS/custom/</code> folder</li>
   <li>Added a Graphical User Interface with Tkinter for a proper presentation of the user inputs and the results outputs (you can take a look at the screenshot below)</li>
+  <li>Added cluster inventory with their features (I choose the 4 most important features for now, but can be changed)</li>
+  <li>Added a generated graph visualization window (accessible by a button), which is automatically saved in the <code>GRAPH</code> folder as a PNG file (format can be changed in the code among many other well-known formats)</li>
+  <li>Added the ability to generate a GEXF file which is automatically saved in the <code>GEXF</code> folder (This function is almost complete, it lacks the right coordinates of each node)</li>
 </ul>
 
+<h3>Interface</h3>
+
 <img src="GUIv1.png"/>
-<img src="illustr.png"/>
+
+<h3>Graphs</h3>
+
+<img src="graph.png"/>
 
 <h3>In progress</h3>
 
 <ul>
-  <li>integrate results in the GUI (dataframe and graph)</li>
-  <li>Hapaxes-finding function</li>
+  <li>please refer to the roadmap section down below...</li>
 </ul>
 
 # Requirements to run the latest source file
@@ -42,6 +50,9 @@ NLPvs is a WIP student project aimed to parse a large ammount of text from PDF f
   <li><a href=https://pandas.pydata.org/>Pandas</a>, used to create dataframes(tables) from the extracted data</li>
   <li><a href=https://github.com/pdfminer/pdfminer.six#pdfminersix>PDFMiner.six</a>, a PDF parsing library</li>
   <li><a href=https://scikit-learn.org/stable/index.html>Scikit Learn</a>, Machine Learning Oriented API</li>
+  <li><a href=https://numpy.org/>Numpy</a> an array oriented library (used to calculate the eucledean distance for the graph)</li>
+  <li><a href=https://networkx.github.io/>Networkx</a> a library oriented towards neural networks visualization</li>
+  <li><a href=https://matplotlib.org/>Mathplotlib</a> a library oriented towards graphical visualization</li>
   <li>another folder in the same directory as the source code to dump all the PDF files to classify</li>
   <li>Some test PDF files (to test the classification)</li>
 </ul>
@@ -59,13 +70,14 @@ NLPvs is a WIP student project aimed to parse a large ammount of text from PDF f
 <h3>Machine-learning part</h3>
 
 <ul>
+  <li>Fix the GEXF export function</li>
+  <li>(CSV export function)</li>
   <li>Accelerate K-means on GPU with the use of RAPIDS</li>
-  <li>Export a clustering graph to visualize the classification</li>
-  <li>Extract features</li>
   <li>Benchmark to compare execution between CPU and GPU (add a button in the GUI)</li>
-  <li>(Basic analysis such as nbr of words, lexical richness, hapaxes, etc... which doesn't rely on ML)</li>
   <li>(Find A LOT MORE PDF files to make a decent database)</li>
 </ul>
+
+# For the future
 
 <h3>Deep-learning part</h3>
 
@@ -98,11 +110,12 @@ NLPvs is a WIP student project aimed to parse a large ammount of text from PDF f
   <li><a href=https://medium.com/@MSalnikov/text-clustering-with-k-means-and-tf-idf-f099bcf95183>TF-IDF Explained and applied</a></li>
   <li><a href=https://medium.com/rapids-ai/combining-speed-scale-to-accelerate-k-means-in-rapids-cuml-8d45e5ce39f5>Accelerate K-means with CUDA using RAPIDS</a></li>
   <li><a href=https://scikit-learn.org/stable/modules/model_persistence.html>Good advices to manage dumped models</a></li>
+  <li><a href=http://brandonrose.org/clustering>Document Clustering with Python</a></li>
   
 </ul>
 
 # Additional Notes
 
 <ul>
-  <li>I have the choice between Tensorflow and Pytorch for deep learning. For the moment, I intend to use Pytorch as it's more familiar to me.</li>
+  <li>I'm planning to compile the programm and make a release soon...</li>
 </ul>
