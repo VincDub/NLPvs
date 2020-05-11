@@ -29,12 +29,14 @@ from french_lefff_lemmatizer.french_lefff_lemmatizer import FrenchLefffLemmatize
 from nltk import FreqDist
 
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
+import sklearn.cluster as skcl
 from sklearn.manifold import MDS
 from sklearn.metrics.pairwise import cosine_similarity
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+
+import cuml.cluster as cucl
 
 ### GENERATION COULEURS ALEATOIRES LES PLUS DISTINCTES POSSIBLE
 
@@ -354,7 +356,7 @@ def j_phrases(txt):
     return liste_textes
 '''
 
-def entrainer_depuis_corpus(dir_src,n):
+def entrainer_depuis_corpus(dir_src,n,gpu):
 
     preprocess = preprocess_pdf_masse(dir_src)
 
@@ -374,11 +376,19 @@ def entrainer_depuis_corpus(dir_src,n):
 
     corpus_vect = tfconv.transform(sac2)
 
-    modele_custom = KMeans(n_clusters=n, init='k-means++').fit(corpus_vect)
+    if gpu == False:
+
+        modele_custom = skcl.KMeans(n_clusters=n, init='k-means++').fit(corpus_vect)
+        suffixe = "-CPU"
+    
+    else:
+
+        modele_custom = cucl.KMeans(n_clusters=n, init='k-means++').fit(corpus_vect)
+        suffixe = "-CUDA_(GPU Nvidia Requis)"
 
     cd = 'MODEL'
     t = str(datetime.datetime.now()).split('.')
-    path= os.path.join(cd,t[0])
+    path= os.path.join(cd,t[0]+(suffixe))
     os.mkdir(path)
 
     termes = tfconv.get_feature_names()
@@ -392,7 +402,7 @@ def entrainer_depuis_corpus(dir_src,n):
     return modele_custom,tfconv,vocab
 
 
-def tester_texte(dir_src,dir_test,n,entrainer,dir_model):
+def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu):
 
     t_0 = time.time()
 
@@ -425,7 +435,7 @@ def tester_texte(dir_src,dir_test,n,entrainer,dir_model):
 
     else:
 
-        entrainement = entrainer_depuis_corpus(dir_src,n)
+        entrainement = entrainer_depuis_corpus(dir_src,n,gpu)
         modele = entrainement[0]
         vectoriseur = entrainement[1]
         vocab = entrainement[2]
@@ -459,7 +469,7 @@ def tester_texte(dir_src,dir_test,n,entrainer,dir_model):
     return resultat_class , delta_t, modele, termes, vocab, resultat_matrix, labels_cl,noms
 
 
-def start(frame,bench,src,test,n,entrain,mdl,cl):
+def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool):
 
     dir_test = test.cget("text")
     dir_mdl = mdl.cget("text")
@@ -472,7 +482,7 @@ def start(frame,bench,src,test,n,entrain,mdl,cl):
 
         n_cl = joblib.load(dir_mdl+'/nb_clust.sav')
 
-        result = tester_texte(dir_src,dir_test,n_cl,entrainer=False,dir_model=dir_mdl)
+        result = tester_texte(dir_src,dir_test,n_cl,entrainer=False,dir_model=dir_mdl, gpu = gpu_bool)
 
         result_clusters = clusters_en_features(result[2],n_cl,result[3],result[4])
 
@@ -504,7 +514,7 @@ def start(frame,bench,src,test,n,entrain,mdl,cl):
         n_cl = int(n.get())
         dir_src = src.cget("text")
 
-        result = tester_texte(dir_src,dir_test,n_cl,entrainer=True,dir_model=dir_mdl)
+        result = tester_texte(dir_src,dir_test,n_cl,entrainer=True,dir_model=dir_mdl,gpu = gpu_bool)
 
         result_clusters = clusters_en_features(result[2],n_cl,result[3],result[4])
 
@@ -776,15 +786,16 @@ if os.environ.get('DISPLAY','') == '':
 
 fen = Tk()
 
-fen.title("NLPvs beta")
+fen.title('NLPvs')
 fen.configure(background = '#232323')
-fen.geometry('1100x850')
+fen.geometry('1100x900')
 
 fontdemarrer = tkFont.Font(family='Arial',size=50)
 fontcredits = tkFont.Font(family='Arial',size=8)
 
 frame_input = Frame(fen, borderwidth = 0, relief = FLAT, bg = '#232323')
 frame_input.pack(side = LEFT, padx = 20)
+
 
 ligne = Canvas(fen,bg= '#232323', height=700, borderwidth=0, width=50)
 ligne.create_line(25,25,25,675,width=2,fill='#e6e6e6')
@@ -795,8 +806,13 @@ ligne.pack(side=LEFT, padx=70)
 frame_droite = Frame(fen, borderwidth = 0, relief = FLAT, bg = '#232323')
 frame_droite.pack(side=LEFT, padx=20)
 
-titre = Label(frame_input,text='NLPvs beta',fg='#e6e6e6', bg ='#232323',font=fontdemarrer)
-titre.pack()
+log_o = Image.open('logo.png')
+log_o_md = log_o.resize((250, 83),Image.ANTIALIAS)
+logo = ImageTk.PhotoImage(log_o_md)
+logo_label = Label(frame_input, image=logo, bg = '#232323' )
+logo_label.place(x=0,y=0)
+logo_label.pack(padx = 40)
+
 credit = Label(frame_input,text='par Vincent DUBOIS',fg='#e6e6e6', bg ='#232323',font=fontcredits)
 credit.pack()
 
@@ -882,6 +898,15 @@ train_true = Radiobutton(frame_train, text="oui", variable=entrain, value=True,b
 train_true.pack(pady=5)
 train_false = Radiobutton(frame_train, text="non", variable=entrain, value=False,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
 train_false.pack(pady=5)
+
+#choix gpu/cpu
+gpu = BooleanVar()
+
+gpu_true = Radiobutton(frame_train, text="Accélération CUDA (GPU Nvidia requis)", variable=gpu, value=True,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
+gpu_true.pack(pady=5)
+gpu_false = Radiobutton(frame_train, text="CPU", variable=gpu, value=False,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
+gpu_false.pack(pady=5)
+
 #nombre de clusters
 
 clusters = LabelFrame(frame_train, borderwidth=0, text='Nombre de clusters', relief = SUNKEN, bg = '#e6e6e6')
@@ -906,7 +931,7 @@ r_src.pack(fill=X, pady=10)
 
 #démarrer 
 
-btn_start = Button(bench_et_start, text="Lancer la classification",height=3, bg = '#00C800',fg = '#E6E6E6', command=(lambda: start(frame_output, bench_txt, r_src, r_test, n_clusters, entrain=entrain, mdl = r_mdl, cl=cl_output)))
+btn_start = Button(bench_et_start, text="Lancer la classification",height=3, bg = '#00C800',fg = '#E6E6E6', command=(lambda: start(frame_output, bench_txt, r_src, r_test, n_clusters, entrain=entrain, mdl = r_mdl, cl=cl_output, gpu_bool = gpu)))
 btn_start.config(highlightthickness = 1, highlightbackground='#009100', highlightcolor='#009100')
 btn_start.pack(pady= 20, fill=X)
 

@@ -1,10 +1,10 @@
-# NLPvs (04/05/2020 Update)
+# NLPvs (11/05/2020 Update)
 
 <h2>About NLPvs</h2>
 
 NLPvs is a WIP student project aimed to classify a large ammount of text from PDF files by using an unsupervised ML alforithm based on K-means. Although it has been imagined to crunch research-oriented documents written in French (such as thesis, etc...), its use could be easily extended to other fields.
 
-<img src="illustr.png"/>
+<img src="schema.png"/>
 
 # Current Status 
 
@@ -24,6 +24,7 @@ NLPvs is a WIP student project aimed to classify a large ammount of text from PD
   <li>Added cluster inventory with their features (I choose the 4 most important features for now, but can be changed)</li>
   <li>Added a generated graph visualization window (accessible by a button), which is automatically saved in the <code>GRAPH</code> folder as a PNG file (format can be changed in the code among many other well-known formats)</li>
   <li>Added the ability to generate a GEXF file which is automatically saved in the <code>GEXF</code> folder (This function is almost complete, it lacks the right coordinates of each node)</li>
+  <li>Added the ability to make a model use the CUDA cores (user defined option)</li>
 </ul>
 
 <h3>Interface</h3>
@@ -53,6 +54,7 @@ NLPvs is a WIP student project aimed to classify a large ammount of text from PD
   <li><a href=https://numpy.org/>Numpy</a> an array oriented library (used to calculate the eucledean distance for the graph)</li>
   <li><a href=https://networkx.github.io/>Networkx</a> a library oriented towards neural networks visualization</li>
   <li><a href=https://matplotlib.org/>Mathplotlib</a> a library oriented towards graphical visualization</li>
+  <li><a href=https://github.com/rapidsai/cuml>CuML</a> a library which provides CUDA Accelerated ML algorithms</li>
   <li>another folder in the same directory as the source code to dump all the PDF files to classify</li>
   <li>Some test PDF files (to test the classification)</li>
 </ul>
@@ -72,8 +74,7 @@ NLPvs is a WIP student project aimed to classify a large ammount of text from PD
 <ul>
   <li>Fix the GEXF export function</li>
   <li>(CSV export function)</li>
-  <li>Accelerate K-means on GPU with the use of RAPIDS</li>
-  <li>Benchmark to compare execution between CPU and GPU (add a button in the GUI)</li>
+  <li>Benchmark to compare execution between CPU and GPU</li>
   <li>(Find A LOT MORE PDF files to make a decent database)</li>
 </ul>
 
