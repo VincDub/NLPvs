@@ -36,7 +36,12 @@ from sklearn.metrics.pairwise import cosine_similarity
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-import cuml.cluster as cucl
+#import cuml.cluster as cucl
+
+try:
+    import cuml.cluster as cucl
+except ImportError:
+    cucl = None
 
 ### GENERATION COULEURS ALEATOIRES LES PLUS DISTINCTES POSSIBLE
 
