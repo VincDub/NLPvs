@@ -331,9 +331,27 @@ def vectoriser_avec_noms(dir_src,vectoriz):
 
     sac = preprocess[1]
 
-    textes_vec.append(vectoriz.transform(sac))
+    matrice = vectoriz.fit_transform(sac)
 
-    return noms, textes_vec
+    textes_vec.append(matrice)
+
+    return noms, textes_vec, matrice
+
+
+def vectoriser_avec_noms_diff(dir_src,vectoriz):
+
+    preprocess = preprocess_pdf_masse(dir_src)
+
+    noms = preprocess[0]
+    textes_vec = list()
+
+    sac = preprocess[1]
+
+    matrice = vectoriz.transform(sac)
+
+    textes_vec.append(matrice)
+
+    return noms, textes_vec, matrice
 
 '''
 def sepa(txt):
@@ -366,6 +384,7 @@ def entrainer_depuis_corpus(dir_src,n,gpu):
     preprocess = preprocess_pdf_masse(dir_src)
 
     sac2 = preprocess[1]
+    noms = preprocess[0]
 
     ss_racin = []
     racin = []
@@ -376,9 +395,7 @@ def entrainer_depuis_corpus(dir_src,n,gpu):
 
     vocab = pd.DataFrame({'words': ss_racin}, index = racin)
 
-    tfconv = TfidfVectorizer(input = 'content',max_df=0.8, min_df=0.2,max_features = 9000000,ngram_range=(1,3), token_pattern=None,analyzer='word',preprocessor=None,lowercase=False, tokenizer=token_pour_tfidf)
-    tfconv = tfconv.fit(sac2)
-
+    tfconv = TfidfVectorizer(input = 'content',max_df=0.8, min_df=0.2,max_features = 9000000,ngram_range=(1,3), token_pattern=None,analyzer='word',preprocessor=None,lowercase=False, tokenizer=token_pour_tfidf).fit(sac2)
     corpus_vect = tfconv.transform(sac2)
 
     if gpu == False:
@@ -386,14 +403,19 @@ def entrainer_depuis_corpus(dir_src,n,gpu):
         modele_custom = skcl.KMeans(n_clusters=n, init='k-means++').fit(corpus_vect)
         suffixe = "-CPU"
     
+    elif cucl == None:
+
+        modele_custom = skcl.KMeans(n_clusters=n, init='k-means++').fit(corpus_vect)
+        suffixe = "-CPU"
+
     else:
 
         modele_custom = cucl.KMeans(n_clusters=n, init='k-means++').fit(corpus_vect)
         suffixe = "-CUDA_(GPU Nvidia Requis)"
 
     cd = 'MODEL'
-    t = str(datetime.datetime.now()).split('.')
-    path= os.path.join(cd,t[0]+(suffixe))
+    t = str(datetime.datetime.now()).replace(':','_')
+    path= os.path.join(cd,t[:-7]+(suffixe))
     os.mkdir(path)
 
     termes = tfconv.get_feature_names()
@@ -403,8 +425,13 @@ def entrainer_depuis_corpus(dir_src,n,gpu):
     joblib.dump(n,(path + '/nb_clust.sav'))
     joblib.dump(vocab,(path + '/vocab.sav'))
     joblib.dump(termes,(path + '/termes.sav'))
+    nm = open((path+"/noms.txt"),"w+")
 
-    return modele_custom,tfconv,vocab
+    for x in noms:
+        nm.write(x+"\n")
+    nm.close()
+
+    return modele_custom,tfconv,vocab,noms
 
 
 def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu):
@@ -417,26 +444,64 @@ def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu):
         vectoriseur = joblib.load(dir_model+'/vect.sav')
         termes = joblib.load(dir_model+'/termes.sav')
         vocab = joblib.load(dir_model+'/vocab.sav')
+        f = open((dir_model+'/noms.txt'),"r")
+
+        noms_entrainement = list()
+
+        for lignes in f.readlines():
+
+            lignes.replace("\n","")
+            noms_entrainement.append(lignes[4:-1])
+
+        f.close()
 
         labels_cl = modele.labels_.tolist()
 
-        txt_= vectoriser_avec_noms(dir_test,vectoriseur)
-        txt_vec = txt_[1]
-        noms = txt_[0]
+        noms = fichiers_cibles(dir_test)
 
-        resultat_class = list()
+        a = 0
+        j = len(noms_entrainement)
 
-        resultat_matrix = list()
+        for x in noms:
 
-        for i in range (0,len(noms)):
-            
-            for texte in txt_vec:   
-            
-                resultat = modele.predict(texte)
+            sp = x.split('/')
 
-                resultat_matrix.append(resultat)
+            if sp[-1] in noms_entrainement:
+                a+=1
+            else:
+                break
 
-            resultat_class.append((noms[i],resultat[i]))
+        if a == j :
+
+            txt_ = vectoriser_avec_noms(dir_test,vectoriseur)
+            txt_vec = txt_[1]
+            resultat_matrix = txt_[2]
+
+            resultat_class = list()
+
+            for i in range (0,len(noms)):
+                    
+                for texte in txt_vec:   
+                    
+                    resultat = modele.predict(texte)
+
+                resultat_class.append((noms[i],resultat[i]))
+
+        else :
+
+            txt_diff= vectoriser_avec_noms_diff(dir_test, vectoriseur)
+            txt_vec_diff= txt_diff[1]
+            resultat_matrix = txt_diff[2]
+
+            resultat_class = list()
+
+            for i in range (0,len(noms)):
+                    
+                for texte in txt_vec_diff:   
+                    
+                    resultat = modele.predict(texte)
+
+                resultat_class.append((noms[i],resultat[i]))
 
     else:
 
@@ -444,29 +509,64 @@ def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu):
         modele = entrainement[0]
         vectoriseur = entrainement[1]
         vocab = entrainement[2]
+        noms_entrainement_originaux = entrainement[3]
+
+        noms_entrainement = list()
+
+        for y in noms_entrainement_originaux:
+
+            noms_entrainement.append(y[4:])
 
         labels_cl = modele.labels_.tolist()
 
         termes = vectoriseur.get_feature_names()
 
-        txt_= vectoriser_avec_noms(dir_test, vectoriseur)
-        txt_vec = txt_[1]
-        noms = txt_[0]
+        noms = fichiers_cibles(dir_test)
 
-        resultat_class = list()
+        a = 0
+        j = len(noms_entrainement)
 
-        resultat_matrix = list()
+        for x in noms:
 
-        for i in range (0,len(noms)):
+            sp = x.split('/')
 
-            for texte in txt_vec:
+            if sp[-1] in noms_entrainement:
+                a+=1
+            else:
+                break
+
+        if a == j :
+
+            txt_ = vectoriser_avec_noms(dir_test,vectoriseur)
+            txt_vec = txt_[1]
+            resultat_matrix = txt_[2]
+
+            resultat_class = list()
+
+            for i in range (0,len(noms)):
+
+                for texte in txt_vec:
+                
+                    resultat = modele.predict(texte)
+
+                resultat_class.append((noms[i],resultat[i]))
+        else:
+
+            txt_diff= vectoriser_avec_noms_diff(dir_test, vectoriseur)
+            txt_vec_diff = txt_diff[1]
+            resultat_matrix = txt_diff[2]
+
+            resultat_class = list()
+
+            for i in range (0,len(noms)):
+
+                for texte in txt_vec_diff:
+                
+                    resultat = modele.predict(texte)
+
+                resultat_class.append((noms[i],resultat[i]))
+
             
-                resultat = modele.predict(texte)
-
-                resultat_matrix.append(resultat)
-
-            resultat_class.append((noms[i],resultat[i]))
-
     t_1 = time.time()
 
     delta_t = "effectué en " + str((t_1 - t_0))[:5] + " secondes."
@@ -643,8 +743,8 @@ def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,f
         ax.text(df.iloc[i]['x'], df.iloc[i]['y'], df.iloc[i]['titres'], size=8)
 
     cd = 'GRAPH'
-    t = str(datetime.datetime.now()).split('.')
-    nm = cd + '/' + t[0] +'.png'
+    t = str(datetime.datetime.now()).replace(':','_')
+    nm = cd + '/' + t[:-7] +'.png'
 
     plt.savefig(nm)
 
@@ -756,8 +856,8 @@ def generer_gexf(df,couleurs_clusters, noms_clusters):
 
     nx.draw_networkx(G, pos = node_pos, with_labels=True)
 
-    t = str(datetime.datetime.now()).split('.')
-    chm = 'GEXF/' + t[0] +'.gexf'
+    t = str(datetime.datetime.now()).replace(':','_')
+    chm = 'GEXF/' + t[:-7] +'.gexf'
 
     file = open(chm, "w")
 

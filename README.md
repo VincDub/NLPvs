@@ -1,8 +1,8 @@
-# NLPvs (11/05/2020 Update)
+# NLPvs (16/05/2020 Update)
 
 <h2>About NLPvs</h2>
 
-NLPvs is a WIP student project aimed to classify a large ammount of text from PDF files by using an unsupervised ML alforithm based on K-means. Although it has been imagined to crunch research-oriented documents written in French (such as thesis, etc...), its use could be easily extended to other fields.
+NLPvs is a WIP student project aimed to classify a large ammount of text from PDF files by using an unsupervised ML algorithm based on K-means. Although it has been imagined to crunch research-oriented documents written in French (such as thesis, etc...), its use could be easily extended to other fields.
 
 <img src="schema.png"/>
 
@@ -31,15 +31,9 @@ NLPvs is a WIP student project aimed to classify a large ammount of text from PD
 
 <img src="GUIv1.png"/>
 
-<h3>Graphs</h3>
+<h3>Graph example</h3>
 
 <img src="graph.png"/>
-
-<h3>In progress</h3>
-
-<ul>
-  <li>please refer to the roadmap section down below...</li>
-</ul>
 
 # Requirements to run the latest source file
 
@@ -47,6 +41,7 @@ NLPvs is a WIP student project aimed to classify a large ammount of text from PD
 
 <ul>
   <li>Python (3.7.6, but should work on latest available version)</li>
+  <li>Pillow (PIL)</li>
   <li><a href=https://www.nltk.org/>NLTK</a>, a Natural Processing Language library</li>
   <li><a href=https://pandas.pydata.org/>Pandas</a>, used to create dataframes(tables) from the extracted data</li>
   <li><a href=https://github.com/pdfminer/pdfminer.six#pdfminersix>PDFMiner.six</a>, a PDF parsing library</li>
@@ -55,6 +50,7 @@ NLPvs is a WIP student project aimed to classify a large ammount of text from PD
   <li><a href=https://networkx.github.io/>Networkx</a> a library oriented towards neural networks visualization</li>
   <li><a href=https://matplotlib.org/>Mathplotlib</a> a library oriented towards graphical visualization</li>
   <li><a href=https://github.com/rapidsai/cuml>CuML</a> a library which provides CUDA Accelerated ML algorithms</li>
+  <li><a href=https://github.com/ClaudeCoulombe/FrenchLefffLemmatizer>FrenchLefffLemmatizer</a> a lemmatizer for french language</li>
   <li>another folder in the same directory as the source code to dump all the PDF files to classify</li>
   <li>Some test PDF files (to test the classification)</li>
 </ul>
@@ -69,18 +65,15 @@ NLPvs is a WIP student project aimed to classify a large ammount of text from PD
 
 # Roadmap
 
-<h3>Machine-learning part</h3>
+<h3>Possible future features</h3>
 
 <ul>
-  <li>Fix the GEXF export function</li>
-  <li>(CSV export function)</li>
-  <li>Benchmark to compare execution between CPU and GPU</li>
-  <li>(Find A LOT MORE PDF files to make a decent database)</li>
+  <li>Improve the GEXF export function</li>
 </ul>
 
 # For the future
 
-<h3>Deep-learning part</h3>
+<h3>Deep-learning</h3>
 
 <ul>
   <li>Create an Pytorch Framework based envrionment on the GPU-equiped workstation (docker will be needed to add the pytorch distro from nvidia repos)</li>
@@ -118,5 +111,5 @@ NLPvs is a WIP student project aimed to classify a large ammount of text from PD
 # Additional Notes
 
 <ul>
-  <li>I'm planning to compile the programm and make a release soon...</li>
+  <li>Release comming soon... </li>
 </ul>
