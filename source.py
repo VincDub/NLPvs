@@ -740,11 +740,13 @@ def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,f
     ax.legend(numpoints=1)
 
     for i in range(len(df)):
-        ax.text(df.iloc[i]['x'], df.iloc[i]['y'], df.iloc[i]['titres'], size=8)
+        ax.text(df.iloc[i]['x'], df.iloc[i]['y'], df.iloc[i]['titres'], size=12)
 
     cd = 'GRAPH'
     t = str(datetime.datetime.now()).replace(':','_')
     nm = cd + '/' + t[:-7] +'.png'
+
+    plt.axis("off")
 
     plt.savefig(nm)
 
