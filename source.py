@@ -13,12 +13,15 @@ import joblib
 import sys
 import os
 import random
+import webbrowser
 from tkinter import *
 from tkinter import filedialog
 import datetime
 import tkinter.font as tkFont
 from PIL import Image, ImageTk
 import numpy as np
+from bs4 import BeautifulSoup
+import codecs
 
 import nltk
 from nltk import tokenize
@@ -35,6 +38,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import mpld3
 
 #import cuml.cluster as cucl
 
@@ -88,9 +92,12 @@ def nettoyage_sans_phrases(txt):
         texte = texte.lower()
         rm_ponctuation = str.maketrans('','', string.punctuation)
         texte = texte.translate(rm_ponctuation)
+        texte = "".join([i for i in texte if not i.isdigit()]) ## SUPPRESSION DES CHIFFRES
+        texte = re.sub(u'\u2019',u"\u0027", texte)
         txt_ss.append(texte)
 
     return txt_ss
+
 
 '''
 def phrases(txt):
@@ -127,9 +134,16 @@ def nettoyage_phrases(txt):
 
 def token_pour_tfidf(txt):
 
-    stop_words = set(stopwords.words("french"))
+    stop_words = []
 
-    tk = [mot for mot in txt.split() if (len(mot)>2) and (mot not in stop_words)]
+    f = open(('stopwordsfr.txt'),"r")
+
+    for ligne in f.readlines():
+
+        stop_words.append(ligne[:-1])
+    
+
+    tk = [mot for mot in txt.split() if (len(mot)>3) and (mot not in stop_words)]
 
     blank = ""
     n_tk = [token for token in tk if (token not in blank)]
@@ -141,9 +155,16 @@ def token_pour_tfidf(txt):
 
 def token_sans_racin_pour_tfidf(txt):
 
-    stop_words = set(stopwords.words("french"))
+    stop_words = []
 
-    tk = [mot for mot in txt.split() if (len(mot)>2) and (mot not in stop_words)]
+    f = open(('stopwordsfr.txt'),"r")
+
+    for ligne in f.readlines():
+
+        stop_words.append(ligne[:-1])
+
+
+    tk = [mot for mot in txt.split() if (len(mot)>3) and (mot not in stop_words)]
 
     blank = ""
     n_tk = [token for token in tk if (token not in blank)]
@@ -260,14 +281,55 @@ def nettoyage_2(txt):
 def preprocess_pdf_masse(dir):
 
     noms_fichiers = fichiers_cibles(dir)
+    noms_fichiers_o = list()
     textes_fichiers = list()
     
     for entry in noms_fichiers:
-        textes_fichiers.append(pdfminer.high_level.extract_text(entry,"",None,0,True,'utf-8',None))
+
+        try:
+            textes_fichiers.append(pdfminer.high_level.extract_text(entry,"",None,0,True,'utf-8',None))
+            noms_fichiers_o.append(entry)
+
+        except TypeError:
+            
+            print('la structure du fichier ' + entry + ' est invalide !')
 
     fichiers_clean = nettoyage_sans_phrases(textes_fichiers)
 
-    return noms_fichiers, fichiers_clean
+    return noms_fichiers_o, fichiers_clean
+
+
+def preprocess_html_masse(dir):
+
+    noms_fichiers = fichiers_cibles(dir)
+    textes_fichiers = list()
+    noms_fichiers_o= list()
+    
+    for nom in noms_fichiers:
+ 
+        markup = codecs.open(nom, 'r', 'utf-8')
+        doc = BeautifulSoup(markup,features="html.parser")
+
+        resume = doc.find(id="comp-jrkv04r5") ## Spécfique à une tâche de classement définie
+
+        texte_p = ""
+
+        paragraphes = resume.find_all('p')
+
+        for pa in paragraphes:
+
+            texte_p += " "
+            texte_p += (pa.get_text())
+
+        if len(texte_p) >= 100:
+
+            noms_fichiers_o.append(nom)
+            textes_fichiers.append(texte_p) 
+
+
+    fichiers_clean = nettoyage_sans_phrases(textes_fichiers)
+
+    return noms_fichiers_o, fichiers_clean
 
 '''
     nbr_phrases = list()
@@ -322,9 +384,13 @@ def vectoriser_vrac(dir_src):
 
 '''
 
-def vectoriser_avec_noms(dir_src,vectoriz):
+def vectoriser_avec_noms(dir_src,vectoriz,pdf):
 
-    preprocess = preprocess_pdf_masse(dir_src)
+    if pdf==True:
+
+        preprocess = preprocess_pdf_masse(dir_src)
+    else:
+        preprocess = preprocess_html_masse(dir_src)
 
     noms = preprocess[0]
     textes_vec = list()
@@ -338,9 +404,12 @@ def vectoriser_avec_noms(dir_src,vectoriz):
     return noms, textes_vec, matrice
 
 
-def vectoriser_avec_noms_diff(dir_src,vectoriz):
+def vectoriser_avec_noms_diff(dir_src,vectoriz,pdf):
 
-    preprocess = preprocess_pdf_masse(dir_src)
+    if pdf==True:
+        preprocess = preprocess_pdf_masse(dir_src)
+    else:
+        preprocess = preprocess_html_masse(dir_src)
 
     noms = preprocess[0]
     textes_vec = list()
@@ -379,9 +448,12 @@ def j_phrases(txt):
     return liste_textes
 '''
 
-def entrainer_depuis_corpus(dir_src,n,gpu):
+def entrainer_depuis_corpus(dir_src,n,gpu,pdf):
 
-    preprocess = preprocess_pdf_masse(dir_src)
+    if pdf==True:
+        preprocess = preprocess_pdf_masse(dir_src)
+    else:
+        preprocess = preprocess_html_masse(dir_src)
 
     sac2 = preprocess[1]
     noms = preprocess[0]
@@ -434,7 +506,7 @@ def entrainer_depuis_corpus(dir_src,n,gpu):
     return modele_custom,tfconv,vocab,noms
 
 
-def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu):
+def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu,pdf):
 
     t_0 = time.time()
 
@@ -464,7 +536,7 @@ def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu):
 
         for x in noms:
 
-            sp = x.split('/')
+            sp = os.path.split(x)
 
             if sp[-1] in noms_entrainement:
                 a+=1
@@ -473,7 +545,8 @@ def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu):
 
         if a == j :
 
-            txt_ = vectoriser_avec_noms(dir_test,vectoriseur)
+            txt_ = vectoriser_avec_noms(dir_test,vectoriseur,pdf)
+            noms = txt_[0]
             txt_vec = txt_[1]
             resultat_matrix = txt_[2]
 
@@ -489,7 +562,8 @@ def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu):
 
         else :
 
-            txt_diff= vectoriser_avec_noms_diff(dir_test, vectoriseur)
+            txt_diff= vectoriser_avec_noms_diff(dir_test, vectoriseur,pdf)
+            noms = txt_diff[0]
             txt_vec_diff= txt_diff[1]
             resultat_matrix = txt_diff[2]
 
@@ -505,7 +579,7 @@ def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu):
 
     else:
 
-        entrainement = entrainer_depuis_corpus(dir_src,n,gpu)
+        entrainement = entrainer_depuis_corpus(dir_src,n,gpu,pdf)
         modele = entrainement[0]
         vectoriseur = entrainement[1]
         vocab = entrainement[2]
@@ -528,7 +602,7 @@ def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu):
 
         for x in noms:
 
-            sp = x.split('/')
+            sp = os.path.split(x)
 
             if sp[-1] in noms_entrainement:
                 a+=1
@@ -537,7 +611,8 @@ def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu):
 
         if a == j :
 
-            txt_ = vectoriser_avec_noms(dir_test,vectoriseur)
+            txt_ = vectoriser_avec_noms(dir_test,vectoriseur,pdf)
+            noms = txt_[0]
             txt_vec = txt_[1]
             resultat_matrix = txt_[2]
 
@@ -552,7 +627,8 @@ def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu):
                 resultat_class.append((noms[i],resultat[i]))
         else:
 
-            txt_diff= vectoriser_avec_noms_diff(dir_test, vectoriseur)
+            txt_diff= vectoriser_avec_noms_diff(dir_test, vectoriseur,pdf)
+            noms = txt_diff[0]
             txt_vec_diff = txt_diff[1]
             resultat_matrix = txt_diff[2]
 
@@ -574,7 +650,7 @@ def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu):
     return resultat_class , delta_t, modele, termes, vocab, resultat_matrix, labels_cl,noms
 
 
-def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool):
+def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool,pdf_bool):
 
     dir_test = test.cget("text")
     dir_mdl = mdl.cget("text")
@@ -587,7 +663,7 @@ def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool):
 
         n_cl = joblib.load(dir_mdl+'/nb_clust.sav')
 
-        result = tester_texte(dir_src,dir_test,n_cl,entrainer=False,dir_model=dir_mdl, gpu = gpu_bool)
+        result = tester_texte(dir_src,dir_test,n_cl,entrainer=False,dir_model=dir_mdl, gpu = gpu_bool,pdf = pdf_bool)
 
         result_clusters = clusters_en_features(result[2],n_cl,result[3],result[4])
 
@@ -602,7 +678,7 @@ def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool):
 
         for resultat in result[0]:
 
-            nom_indiv = str(resultat[0]).split('/')
+            nom_indiv = os.path.split(str(resultat[0]))
 
             result_txt = nom_indiv[-1] + ' affecté au cluster N° '+ str(resultat[1])
 
@@ -610,7 +686,7 @@ def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool):
 
             liste_index.append(resultat[1])
 
-        graph = produire_graph_2d(result[5],result_clusters,liste_index,result[7],frame)
+        graph = produire_graph_2d(result[5],result_clusters,liste_index,result[7],frame,pdf)
 
         
         
@@ -619,7 +695,7 @@ def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool):
         n_cl = int(n.get())
         dir_src = src.cget("text")
 
-        result = tester_texte(dir_src,dir_test,n_cl,entrainer=True,dir_model=dir_mdl,gpu = gpu_bool)
+        result = tester_texte(dir_src,dir_test,n_cl,entrainer=True,dir_model=dir_mdl,gpu = gpu_bool, pdf = pdf_bool)
 
         result_clusters = clusters_en_features(result[2],n_cl,result[3],result[4])
 
@@ -634,7 +710,7 @@ def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool):
 
         for resultat in result[0]:
 
-            nom_indiv = str(resultat[0]).split('/')
+            nom_indiv = os.path.split(str(resultat[0]))
 
             result_txt = nom_indiv[-1] + ' affecté au cluster N° '+ str(resultat[1])
 
@@ -642,7 +718,7 @@ def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool):
 
             liste_index.append(resultat[1])
 
-        graph = produire_graph_2d(result[5],result_clusters,liste_index,result[7],frame)
+        graph = produire_graph_2d(result[5],result_clusters,liste_index,result[7],frame,pdf)
 
     msg = 'Graph exporté sous :' + graph
 
@@ -662,11 +738,17 @@ def clusters_en_features(mdl,n,termes,vocab):
             tm.append(term)
 
     clusters_dict = dict()
+
     for i in range(n):
+
         mots_par_clusters = []
 
         for ind in order_centroids[i, :4]:
-            mot = (' %s' % vocab.loc[tm[ind].split(' ')].values.tolist()[0][0]).encode('ascii','ignore').decode('utf-8','ignore')
+
+            term_ind = tm[ind]
+
+
+            mot = (vocab.at[term_ind,'words'])[0]
             
             mots_par_clusters.append(mot)
 
@@ -675,7 +757,7 @@ def clusters_en_features(mdl,n,termes,vocab):
     return clusters_dict
 
 
-def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,frame_log):
+def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,frame_log,pdf):
 
     ## CONVERSION DATA EN 2D
 
@@ -708,54 +790,141 @@ def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,f
 
     for titre in titres_docs_class:
 
-        nom_solo = (titre.split('/'))[-1]
+        if pdf == True:
 
-        noms_docs.append(nom_solo[:-4])
+            nom_solo = (os.path.split(titre))[-1]
 
+            noms_docs.append(nom_solo[:-4])
+
+        else:
+
+            nom_solo = (os.path.split(titre))[-1]
+
+            noms_docs.append(nom_solo)
+
+    
+    class TopToolbar(mpld3.plugins.PluginBase):
+
+        JAVASCRIPT = """
+        mpld3.register_plugin("toptoolbar", TopToolbar);
+        TopToolbar.prototype = Object.create(mpld3.Plugin.prototype);
+        TopToolbar.prototype.constructor = TopToolbar;
+        function TopToolbar(fig, props){mpld3.Plugin.call(this, fig, props);};
+
+        TopToolbar.prototype.draw = function(){
+        this.fig.toolbar.draw();
+
+        this.fig.toolbar.toolbar.attr("x", 0);
+        this.fig.toolbar.toolbar.attr("y", 0);
+        this.fig.toolbar.toolbar.attr("width", 48);
+        this.fig.toolbar.toolbar.attr("height", 16);
+
+        this.fig.toolbar.draw = function() {}
+        };
+        """
+
+        def __init__(self):
+            self.dict_ = {"type": "toptoolbar"}
+    
 
     df = pd.DataFrame(dict(x=xs, y=ys, label=labels_docs_class, titres=noms_docs)) 
 
     groupes = df.groupby('label')
 
-    fig, ax = plt.subplots(figsize=(17, 9))
-    ax.margins(0.05)
+    css = """
+
+
+    body > div > div {
+        width: 100%;
+        height: 100vh;
+    }
+
+    text.mpld3-text, div.mpld3-tooltip {
+    font-family:Arial, Helvetica, sans-serif;font-size:20px;
+    }
+
+    g.mpld3-xaxis, g.mpld3-yaxis {
+    display: none; }
+
+    svg.mpld3-figure > g.mpld3-baseaxes {
+        position: absolute !important;
+
+     }
+
+    svg.mpld3-figure > g.mpld3-baseaxes > g.mpld3-axes {
+    width: auto;
+    height: auto;
+     }
+    
+
+    svg.mpld3-figure {
+        position: absolute;
+        width: auto;
+        height: auto;}
+    """
+
+    fig, ax = plt.subplots(figsize=(17,9))
+    ax.margins(0.01)
+
+    elem_points = []
+    titres_tot = []
+    titres_clust = []
+    titres_trsp = []
 
     for nom, groupe in groupes:
-        ax.plot(groupe.x, groupe.y, marker='o', linestyle='', ms=12, 
+
+        points = ax.plot(groupe.x, groupe.y, marker='o', linestyle='', ms=22, 
                 label=noms_clusters[nom], color=couleurs_clusters[nom], mec='none')
+
         ax.set_aspect('auto')
-        ax.tick_params(\
-            axis= 'x', 
-            which='both',
-            bottom='off', 
-            top='off',
-            labelbottom='off')
-        ax.tick_params(\
-            axis= 'y',
-            which='both', 
-            left='off',     
-            top='off',         
-            labelleft='off')
 
-    ax.legend(numpoints=1)
+        titres_clust.append(noms_clusters[nom])
 
-    for i in range(len(df)):
-        ax.text(df.iloc[i]['x'], df.iloc[i]['y'], df.iloc[i]['titres'], size=12)
+        titres = []
+
+        j=0
+        for i in groupe.titres:
+
+            #annot = ax.text((groupe.x).item(j),(groupe.y).item(j),i,label=noms_clusters[nom],alpha=0.0,size=20)
+            titres.append(i)
+            j+=1
+
+        #titres_trsp.append(annot)
+
+        elem_points.append(points)
+
+        titres_tot.append(titres)
+
+    for i in range(len(groupes)):
+    
+        affichage_noms= mpld3.plugins.PointHTMLTooltip(elem_points[i][0],titres_tot[i],voffset=1, hoffset=1, css=css)
+
+        ilegend = mpld3.plugins.InteractiveLegendPlugin(elem_points,titres_clust,alpha_unsel=0.2, alpha_over=1.5)
+
+        mpld3.plugins.connect(fig, affichage_noms, ilegend,TopToolbar())
+
+        ax.axes.get_xaxis().set_ticks([])
+        ax.axes.get_yaxis().set_ticks([])
+        ax.axes.get_xaxis().set_visible(False)
+        ax.axes.get_yaxis().set_visible(False)
+
+    plt.subplots_adjust(right=0.7)
+
 
     cd = 'GRAPH'
     t = str(datetime.datetime.now()).replace(':','_')
-    nm = cd + '/' + t[:-7] +'.png'
+    nm = os.path.join(cd, (t[:-7] + '.html'))
 
-    plt.axis("off")
+    mpld3.save_html(fig,nm)
 
-    plt.savefig(nm)
-
+    '''
     path_gexf = generer_gexf(df,couleurs_clusters,noms_clusters)
 
     msg = 'fichier GEXF enregistré sous : ' + path_gexf + ' avec succès'
 
     frame_log.insert(END,' ')
     frame_log.insert(END,msg)
+    '''
 
     return nm
 
@@ -763,18 +932,8 @@ def afficher_graph(lst):
 
     path = (lst.get(END).split(' :'))[1]
 
-    graph = Tk()
-    t = str(datetime.datetime.now()).split('.')
-    graph.title = str(t[0])
-
-    rendre = ImageTk.PhotoImage(master = graph, file = path)
-    img = Label(graph, image=rendre)
-    h, w = rendre.height(), rendre.width()
-
-    graph.geometry(str(w)+'x'+str(h))
-    img.place(x=0,y=0)
-
-    graph.mainloop()
+    webbrowser.open(path, new=2)
+    
 
 def generer_gexf(df,couleurs_clusters, noms_clusters):
 
@@ -970,8 +1129,17 @@ btn_test = Button(frame_btn_test, relief = GROOVE,text='Sélectionner un dossier
 btn_test.config(fg='#232323')
 btn_test.pack(pady=10)
 
-r_test = Label(frame_btn_test, text = "TEST", bg = '#e6e6e6')
+r_test = Label(frame_btn_test, text = "PDF", bg = '#e6e6e6')
 r_test.pack(fill=X, pady=10)
+
+#choix type de fichier
+
+pdf = BooleanVar()
+
+train_true = Radiobutton(frame_btn_test, text="PDF", variable=pdf, value=True,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
+train_true.pack(pady=5)
+train_false = Radiobutton(frame_btn_test, text="HTML", variable=pdf, value=False,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
+train_false.pack(pady=5)
 
 #selection du modele
 
@@ -1038,7 +1206,7 @@ r_src.pack(fill=X, pady=10)
 
 #démarrer 
 
-btn_start = Button(bench_et_start, text="Lancer la classification",height=3, bg = '#00C800',fg = '#E6E6E6', command=(lambda: start(frame_output, bench_txt, r_src, r_test, n_clusters, entrain=entrain, mdl = r_mdl, cl=cl_output, gpu_bool = gpu)))
+btn_start = Button(bench_et_start, text="Lancer la classification",height=3, bg = '#00C800',fg = '#E6E6E6', command=(lambda: start(frame_output, bench_txt, r_src, r_test, n_clusters, entrain=entrain, mdl = r_mdl, cl=cl_output, gpu_bool = gpu, pdf_bool=pdf)))
 btn_start.config(highlightthickness = 1, highlightbackground='#009100', highlightcolor='#009100')
 btn_start.pack(pady= 20, fill=X)
 

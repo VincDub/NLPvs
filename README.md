@@ -1,4 +1,4 @@
-# NLPvs (16/05/2020 Update)
+# NLPvs (06/07/2020 Update)
 
 <h2>About NLPvs</h2>
 
@@ -25,6 +25,8 @@ NLPvs is a WIP student project aimed to classify a large ammount of text from PD
   <li>Added a generated graph visualization window (accessible by a button), which is automatically saved in the <code>GRAPH</code> folder as a PNG file (format can be changed in the code among many other well-known formats)</li>
   <li>Added the ability to generate a GEXF file which is automatically saved in the <code>GEXF</code> folder (This function is almost complete, it lacks the right coordinates of each node)</li>
   <li>Added the ability to make a model use the CUDA cores (user defined option)</li>
+  <li>Replaced the .PNG result graph with a .HTML file</li>
+  <li>Added the ability to parse HTML files (saved in a local folder)</li>
 </ul>
 
 <h3>Interface</h3>
@@ -51,6 +53,7 @@ NLPvs is a WIP student project aimed to classify a large ammount of text from PD
   <li><a href=https://matplotlib.org/>Mathplotlib</a> a library oriented towards graphical visualization</li>
   <li><a href=https://github.com/rapidsai/cuml>CuML</a> a library which provides CUDA Accelerated ML algorithms</li>
   <li><a href=https://github.com/ClaudeCoulombe/FrenchLefffLemmatizer>FrenchLefffLemmatizer</a> a lemmatizer for french language</li>
+  <li><a href=https://www.crummy.com/software/BeautifulSoup/bs4/doc/#>Beautiful Soup</a> a html parsing library</li>
   <li>another folder in the same directory as the source code to dump all the PDF files to classify</li>
   <li>Some test PDF files (to test the classification)</li>
 </ul>
@@ -68,7 +71,7 @@ NLPvs is a WIP student project aimed to classify a large ammount of text from PD
 <h3>Possible future features</h3>
 
 <ul>
-  <li>Improve the GEXF export function</li>
+  <li>Improve the html interactive graph interface</li>
 </ul>
 
 # For the future
