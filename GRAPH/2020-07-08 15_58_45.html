@@ -1,0 +1,814 @@
+
+
+<style>
+
+
+
+    body > div > div {
+        width: 100%;
+        height: 100vh;
+    }
+
+    text.mpld3-text, div.mpld3-tooltip {
+    font-family:Arial, Helvetica, sans-serif;font-size:18px;
+    }
+
+    g.mpld3-xaxis, g.mpld3-yaxis {
+    display: none; }
+
+    svg.mpld3-figure > g.mpld3-baseaxes {
+        position: absolute !important;
+
+     }
+
+    svg.mpld3-figure > g.mpld3-baseaxes > g.mpld3-axes {
+    width: auto;
+    height: auto;
+     }
+    
+
+    svg.mpld3-figure {
+        position: absolute;
+        width: auto;
+        height: auto;}
+    
+        .legend-box {
+        cursor: pointer;
+        }
+
+        .legend > text {
+        font-family:Arial, Helvetica, sans-serif;font-size:18px;
+        }
+
+        body > div {
+        font-family:Arial, Helvetica, sans-serif;
+        font-size:16px;
+        color:rgba(0,0,0,0.7)
+        background-color: rgba(255,255,255,0.8);
+        }
+        
+</style>
+
+<div id="fig_el702171405661247997608579936862"></div>
+<script>
+function mpld3_load_lib(url, callback){
+  var s = document.createElement('script');
+  s.src = url;
+  s.async = true;
+  s.onreadystatechange = s.onload = callback;
+  s.onerror = function(){console.warn("failed to load library " + url);};
+  document.getElementsByTagName("head")[0].appendChild(s);
+}
+
+if(typeof(mpld3) !== "undefined" && mpld3._mpld3IsLoaded){
+   // already loaded: just create the figure
+   !function(mpld3){
+       
+        mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+        HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+        HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+        HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+        HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                    hoffset:0,
+                                                    voffset:10};
+        function HtmlTooltipPlugin(fig, props){
+            mpld3.Plugin.call(this, fig, props);
+        };
+
+        HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var tooltip = d3.select("body").append("div")
+                        .attr("class", "mpld3-tooltip")
+                        .style("position", "absolute")
+                        .style("z-index", "10")
+                        .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                                tooltip.html(labels[i])
+                                        .style("visibility", "visible");})
+            .on("mousemove", function(d, i){
+                    tooltip
+                        .style("top", d3.event.pageY + this.props.voffset + "px")
+                        .style("left",d3.event.pageX + this.props.hoffset + "px");
+                    }.bind(this))
+            .on("mouseout",  function(d, i){
+                            tooltip.style("visibility", "hidden");});
+        };
+        
+        mpld3.register_plugin("interactive_legend", InteractiveLegend);
+        InteractiveLegend.prototype = Object.create(mpld3.Plugin.prototype);
+        InteractiveLegend.prototype.constructor = InteractiveLegend;
+        InteractiveLegend.prototype.requiredProps = ["element_ids", "labels","text"];
+        InteractiveLegend.prototype.defaultProps = {
+                                                    "ax":null,
+                                                    "alpha_unsel":0.2,
+                                                    "alpha_over":1.0,
+                                                    "start_visible":true}
+        function InteractiveLegend(fig, props){
+            mpld3.Plugin.call(this, fig, props);
+        };
+
+        InteractiveLegend.prototype.draw = function(){
+
+            var alpha_unsel = this.props.alpha_unsel;
+            var alpha_over = this.props.alpha_over;
+            var text = this.props.text;
+
+
+            var legendItems = new Array();
+            for(var i=0; i<this.props.labels.length; i++){
+                console.log(i);
+                var obj = {};
+                obj.label = this.props.labels[i];
+                var texte_cluster_choisi = text[i];
+
+                var element_id = this.props.element_ids[i];
+                console.log(element_id);
+                mpld3_elements = [];
+                _texts = [];
+                for(var j=0; j<element_id.length; j++){
+                    var mpld3_element = mpld3.get_element(element_id[j], this.fig);
+                    var objet = d3.select(mpld3_element);
+                    console.log(objet);
+ 
+                    // mpld3_element might be null in case of Line2D instances
+                    // for we pass the id for both the line and the markers. Either
+                    // one might not exist on the D3 side
+                    if(mpld3_element){
+                        mpld3_elements.push(mpld3_element);}
+                }
+                obj.mpld3_elements = mpld3_elements;
+                obj.visible = this.props.start_visible[i];
+                legendItems.push(obj);
+                set_alphas(obj, false);
+
+            }
+
+            // determine the axes with which this legend is associated
+            var ax = this.props.ax
+            if(!ax){
+                ax = this.fig.axes[0];
+            } else{
+                ax = mpld3.get_element(ax, this.fig);
+            }
+
+            // add a legend group to the canvas of the figure
+            var legend = this.fig.canvas.append("svg:g")
+                                .attr("class", "legend");
+
+            // add the rectangles
+            legend.selectAll("rect")
+                    .data(legendItems)
+                    .enter().append("rect")
+                    .attr("height", 10)
+                    .attr("width", 25)
+                    .attr("x", ax.width + ax.position[0] + 25)
+                    .attr("y",function(d,i) {
+                            return ax.position[1] + i * 25 + 10;})
+                    .attr("stroke", get_color)
+                    .attr("class", "legend-box")
+                    .style("fill", function(d, i) {
+                            return d.visible ? get_color(d) : "white";})
+                    .on("click", click).on('mouseover', over).on('mouseout', out);
+
+            // add the labels
+            legend.selectAll("text")
+                .data(legendItems)
+                .enter().append("text")
+                .attr("x", function (d) {
+                            return ax.width + ax.position[0] + 25 + 40;})
+                .attr("y", function(d,i) {
+                            return ax.position[1] + i * 25 + 10 + 10 - 1;})
+                .text(function(d) { return d.label });
+
+
+            // specify the action on click
+            function click(d,i){
+                d.visible = !d.visible;
+                d3.select(this)
+                .style("fill",function(d, i) {
+                    return d.visible ? get_color(d) : "white";
+                })
+                set_alphas(d, false);
+                var texte = text[i];
+                console.log(d);
+                var css = "mpld3-texte_" + d.label;
+                console.log(css);
+
+                for(var j=0; j<texte.length; j++){
+
+                    console.log(d.mpld3_elements[0]);
+                    console.log(texte[j]);
+                    var elem = d.mpld3_elements[0].pathsobj._groups[0];
+                    var coord = elem[j].getBoundingClientRect();
+
+                    if (d.visible == true) {
+                    var tooltip = (d3.select("body")).append("div")
+                        .attr("class", css )
+                        .style("position", "absolute")
+                        .style("z-index", "10")
+                        .style("visibility", "visible")
+                        .style("top", coord.top + "px")
+                        .style("left", coord.left + "px");
+
+                    tooltip.html(texte[j])
+                        .style("visibility", "visible");
+
+                    } else {
+                    
+                    var bod = d3.select("body")._groups[0];
+                    console.log(bod[0]);
+                    for (var i=0; i < bod[0].childNodes.length; i++) {
+                        if (bod[0].childNodes[i].className == css) {
+                            (bod[0].childNodes[i]).parentNode.removeChild(bod[0].childNodes[i]);
+                            }
+                        }
+
+                    }
+                    
+                }
+            };
+
+            // specify the action on legend overlay 
+            function over(d,i){
+                set_alphas(d, true);
+            };
+
+            // specify the action on legend overlay 
+            function out(d,i){
+                set_alphas(d, false);
+            };
+
+            // helper function for setting alphas
+            function set_alphas(d, is_over){
+                for(var i=0; i<d.mpld3_elements.length; i++){
+                    var type = d.mpld3_elements[i].constructor.name;
+
+                    if(type =="mpld3_Line"){
+                        var current_alpha = d.mpld3_elements[i].props.alpha;
+                        var current_alpha_unsel = current_alpha * alpha_unsel;
+                        var current_alpha_over = current_alpha * alpha_over;
+                        d3.select(d.mpld3_elements[i].path[0][0])
+                            .style("stroke-opacity", is_over ? current_alpha_over :
+                                                    (d.visible ? current_alpha : current_alpha_unsel))
+                            .style("stroke-width", is_over ? 
+                                    alpha_over * d.mpld3_elements[i].props.edgewidth : d.mpld3_elements[i].props.edgewidth);
+                    } else if((type=="mpld3_PathCollection")||
+                            (type=="mpld3_Markers")){
+                        var current_alpha = d.mpld3_elements[i].props.alphas[0];
+                        var current_alpha_unsel = current_alpha * alpha_unsel;
+                        var current_alpha_over = current_alpha * alpha_over;
+                        d3.selectAll(d.mpld3_elements[i].pathsobj[0])
+                            .style("stroke-opacity", is_over ? current_alpha_over :
+                                                    (d.visible ? current_alpha : current_alpha_unsel))
+                            .style("fill-opacity", is_over ? current_alpha_over :
+                                                    (d.visible ? current_alpha : current_alpha_unsel));
+                    
+                    } else{
+                        console.log(type + " not yet supported");
+                    }
+                }
+            };
+
+
+
+            // helper function for determining the color of the rectangles
+            function get_color(d){
+                var type = d.mpld3_elements[0].constructor.name;
+                var color = "black";
+                if(type =="mpld3_Line"){
+                    color = d.mpld3_elements[0].props.edgecolor;
+                } else if((type=="mpld3_PathCollection")||
+                        (type=="mpld3_Markers")){
+                    color = d.mpld3_elements[0].props.facecolors[0];
+                } else{
+                    console.log(type + " not yet supported");
+                }
+                return color;
+            };
+        };
+        
+        mpld3.register_plugin("toptoolbar", TopToolbar);
+        TopToolbar.prototype = Object.create(mpld3.Plugin.prototype);
+        TopToolbar.prototype.constructor = TopToolbar;
+        function TopToolbar(fig, props){mpld3.Plugin.call(this, fig, props);};
+
+        TopToolbar.prototype.draw = function(){
+        this.fig.toolbar.draw();
+
+        this.fig.toolbar.toolbar.attr("x", 0);
+        this.fig.toolbar.toolbar.attr("y", 0);
+        this.fig.toolbar.toolbar.attr("width", 48);
+        this.fig.toolbar.toolbar.attr("height", 16);
+
+        this.fig.toolbar.draw = function() {}
+        };
+        
+       mpld3.draw_figure("fig_el702171405661247997608579936862", {"width": 1700.0, "height": 900.0, "axes": [{"bbox": [0.125, 0.10999999999999999, 0.595, 0.77], "xlim": [-0.6862278710934453, 0.7552124011228327], "ylim": [-0.6073046831943085, 0.6369021347122589], "xdomain": [-0.6862278710934453, 0.7552124011228327], "ydomain": [-0.6073046831943085, 0.6369021347122589], "xscale": "linear", "yscale": "linear", "axes": [{"position": "bottom", "nticks": 9, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": false}, "visible": true}, {"position": "left", "nticks": 9, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": false}, "visible": true}], "axesbg": "#FFFFFF", "axesbgalpha": null, "zoomable": true, "id": "el70217140566141244496", "lines": [], "paths": [], "markers": [{"data": "data01", "xindex": 0, "yindex": 1, "coordinates": "data", "id": "el70217140566141243536pts", "facecolor": "#1F77B4", "edgecolor": "none", "edgewidth": 1.0, "alpha": 0.0, "zorder": 2, "markerpath": [[[0.0, 11.0], [2.9172341000000004, 11.0], [5.715378578633388, 9.840970607470659], [7.778174593052023, 7.778174593052023], [9.840970607470659, 5.715378578633388], [11.0, 2.9172341000000004], [11.0, 0.0], [11.0, -2.9172341000000004], [9.840970607470659, -5.715378578633388], [7.778174593052023, -7.778174593052023], [5.715378578633388, -9.840970607470659], [2.9172341000000004, -11.0], [0.0, -11.0], [-2.9172341000000004, -11.0], [-5.715378578633388, -9.840970607470659], [-7.778174593052023, -7.778174593052023], [-9.840970607470659, -5.715378578633388], [-11.0, -2.9172341000000004], [-11.0, 0.0], [-11.0, 2.9172341000000004], [-9.840970607470659, 5.715378578633388], [-7.778174593052023, 7.778174593052023], [-5.715378578633388, 9.840970607470659], [-2.9172341000000004, 11.0], [0.0, 11.0]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]}], "texts": [{"text": "Classification EVCAU - 2020-07-08", "position": [1.1999999999999997, 0.012025012025011994], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -0.0, "fontsize": 20.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el70217140566126633232"}], "collections": [{"offsets": "data02", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#A45DF5"], "facecolors": ["#A45DF5"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566139138768"}, {"offsets": "data03", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#E5F667"], "facecolors": ["#E5F667"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566139141840"}, {"offsets": "data04", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#62ECCD"], "facecolors": ["#62ECCD"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566133407440"}, {"offsets": "data05", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#7C8E6B"], "facecolors": ["#7C8E6B"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566133405200"}, {"offsets": "data06", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FC82A7"], "facecolors": ["#FC82A7"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566133404496"}, {"offsets": "data07", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#ECDDFC"], "facecolors": ["#ECDDFC"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566133404048"}, {"offsets": "data08", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#BBC2AE"], "facecolors": ["#BBC2AE"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566141191824"}], "images": [], "sharex": [], "sharey": []}], "data": {"data01": [[-0.555948014128237, 0.3507342285434967], [0.2773505994418768, 0.05659052427467041], [-0.1237185871837657, 0.33720991260506006], [0.5004148928279709, -0.24755479110552361], [-0.020819142254847003, -0.5671629143599791], [0.05601669856863247, 0.16013911265429365], [0.3077651626268636, -0.298491372439702], [-0.35658658491917744, 0.6211027646229581], [-0.5926093188760151, -0.37716066191794917], [0.13303712083019034, -0.06686399820848739], [0.1763394912100588, 0.20318544852074927], [-0.2836380153438952, 0.26680040499536584], [0.1460665320693181, -0.38766330714767644], [0.3320625441043341, -0.595106577136401], [0.1359901170638145, 0.41522157627298256], [-0.46126967483991904, -0.03543434555239886], [-0.1985824619749445, 0.06171479225868658], [-0.04512483165081455, -0.08029616676976563], [0.34760442247386975, 0.3863841318440809], [-0.23179220108267373, 0.5615682171384625], [0.29722921398662694, 0.2816095030858446], [-0.46214740276894983, 0.1892121647658625], [-0.6720961037187759, 0.2780667259058489], [0.5359750476086498, 0.1417297081360638], [0.14817536212201005, -0.5800738199725569], [-0.12531845859336418, -0.2185572959922941], [-0.5922344996470865, -0.25547549398328434], [0.3455934589919553, 0.1739141728081404], [-0.37110348507977736, -0.4360923245722785], [-0.04138943250006248, -0.2513819183142931], [-0.612591124602866, 0.00242592441923522], [0.045660441997407424, -0.3867647625078779], [-0.21138972761944694, -0.11516901719242821], [0.5614043312294508, -0.17126803715535743], [0.7410806337481634, -0.20854366517733647], [-0.24333605888257573, -0.46426639623058813], [0.02305316977456814, 0.5535302539818449], [0.4306348204970124, -0.5825122530009837], [0.3567772900063597, -0.10456390347375955], [0.5418011862203305, 0.3862200792853298], [-0.4039306718266726, 0.1319603851591827], [0.49231448060251304, 0.2426680790720506], [-0.14034598872245427, 0.4863567768502101], [-0.3905572836425239, -0.3477929397415481], [-0.27528490506575265, -0.34588058156654666], [0.18098075064626082, 0.6247040286543514], [0.2990397635946269, 0.5511324290529617], [-0.18417740635263397, -0.5727748135879908], [0.6057308475823009, 0.009933329068194564], [-0.42747752342432005, -0.18829017979171148], [0.005370524876388494, 0.41102686292279245]], "data02": [[-0.35658658491917744, 0.6211027646229581], [-0.23179220108267373, 0.5615682171384625], [0.5359750476086498, 0.1417297081360638], [0.02305316977456814, 0.5535302539818449], [0.49231448060251304, 0.2426680790720506], [0.18098075064626082, 0.6247040286543514]], "data03": [[-0.46214740276894983, 0.1892121647658625], [-0.37110348507977736, -0.4360923245722785], [-0.24333605888257573, -0.46426639623058813], [-0.4039306718266726, 0.1319603851591827], [-0.3905572836425239, -0.3477929397415481], [-0.27528490506575265, -0.34588058156654666]], "data04": [[-0.020819142254847003, -0.5671629143599791], [-0.5926093188760151, -0.37716066191794917], [-0.5922344996470865, -0.25547549398328434], [0.5614043312294508, -0.17126803715535743], [0.2990397635946269, 0.5511324290529617], [-0.42747752342432005, -0.18829017979171148]], "data05": [[-0.555948014128237, 0.3507342285434967], [0.1460665320693181, -0.38766330714767644], [-0.46126967483991904, -0.03543434555239886], [-0.612591124602866, 0.00242592441923522], [0.045660441997407424, -0.3867647625078779], [-0.21138972761944694, -0.11516901719242821], [-0.18417740635263397, -0.5727748135879908]], "data06": [[0.3077651626268636, -0.298491372439702], [0.13303712083019034, -0.06686399820848739], [-0.2836380153438952, 0.26680040499536584], [0.3320625441043341, -0.595106577136401], [0.1359901170638145, 0.41522157627298256], [-0.04512483165081455, -0.08029616676976563], [-0.6720961037187759, 0.2780667259058489], [0.14817536212201005, -0.5800738199725569], [-0.12531845859336418, -0.2185572959922941], [0.3455934589919553, 0.1739141728081404], [-0.04138943250006248, -0.2513819183142931], [0.4306348204970124, -0.5825122530009837], [0.3567772900063597, -0.10456390347375955], [-0.14034598872245427, 0.4863567768502101], [0.6057308475823009, 0.009933329068194564]], "data07": [[0.5004148928279709, -0.24755479110552361], [0.7410806337481634, -0.20854366517733647], [0.005370524876388494, 0.41102686292279245]], "data08": [[0.2773505994418768, 0.05659052427467041], [-0.1237185871837657, 0.33720991260506006], [0.05601669856863247, 0.16013911265429365], [0.1763394912100588, 0.20318544852074927], [-0.1985824619749445, 0.06171479225868658], [0.34760442247386975, 0.3863841318440809], [0.29722921398662694, 0.2816095030858446], [0.5418011862203305, 0.3862200792853298]]}, "id": "el70217140566124799760", "plugins": [{"type": "reset"}, {"type": "zoom", "button": true, "enabled": false}, {"type": "boxzoom", "button": true, "enabled": false}, {"type": "htmltooltip", "id": "el70217140566141243536pts", "labels": ["MAGERAND-Jean", "BASBOUS-Karim", "MAS-Jean", "WACTA-Christine", "EKIZOGLU-Esin", "TOUBANOS-Dimitri", "GALLE-Anne-Claire", "CELNIK-Olivier", "JEAN-JACQUES-Sarah", "CECCARINI-Patrice", "PELISSIER-Alain", "RASOLONIAINA-Louisette", "BRUCCULERI-Antonio", "BOTTIER-Patrick", "BOUTROS-Nader", "TRASI-Nicolleta", "SALLES-Sylvie", "GRUSON-Fran\u00e7ois", "MORANDI-Christian", "MEMET-S\u00e9bastien", "BAILLY-Claire", "NAFA-Chehrazade", "AUGER-Yann", "BOURBONNAIS-S\u00e9bastien", "CLEMENT-Caroline", "DESCHAMPS-Catherine", "MAAROUF-Nihal", "MORTAMAIS-Elizabeth", "BONNEAU-Lila-", "KOURNIATI-Marilena", "BLANCHI-Yann", "BELLAT-Fabien", "SEVERO-Donato", "GU\u00c9RIN-Philippe", "MARCOS-BOURHIS-Isabel", "PROTH-Bruno", "BOUET-Olivier", "BENNOUNA-Zineb", "DOUTRIAUX-Emmanuel", "DEL-Andr\u00e9", "GILLOT-Laurence", "SERERO-David", "NGUYEN-Phuoc-Van-Anh", "LANGLOIS-Gilles-Antoine", "GAIMARD-Marie", "CHOPIN-Frank", "WURTZ-Dominique", "BERNARD-Marc", "TERRACOL-Pascal", "GAISSAD-Laurent", "HAMMOUDI-Toufik"], "hoffset": 1, "voffset": 1}, {"type": "interactive_legend", "element_ids": [["el70217140566139138768"], ["el70217140566139141840"], ["el70217140566133407440"], ["el70217140566133405200"], ["el70217140566133404496"], ["el70217140566133404048"], ["el70217140566141191824"]], "text": [["CELNIK-Olivier", "MEMET-S\u00e9bastien", "BOURBONNAIS-S\u00e9bastien", "BOUET-Olivier", "SERERO-David", "CHOPIN-Frank"], ["NAFA-Chehrazade", "BONNEAU-Lila-", "PROTH-Bruno", "GILLOT-Laurence", "LANGLOIS-Gilles-Antoine", "GAIMARD-Marie"], ["EKIZOGLU-Esin", "JEAN-JACQUES-Sarah", "MAAROUF-Nihal", "GU\u00c9RIN-Philippe", "WURTZ-Dominique", "GAISSAD-Laurent"], ["MAGERAND-Jean", "BRUCCULERI-Antonio", "TRASI-Nicolleta", "BLANCHI-Yann", "BELLAT-Fabien", "SEVERO-Donato", "BERNARD-Marc"], ["GALLE-Anne-Claire", "CECCARINI-Patrice", "RASOLONIAINA-Louisette", "BOTTIER-Patrick", "BOUTROS-Nader", "GRUSON-Fran\u00e7ois", "AUGER-Yann", "CLEMENT-Caroline", "DESCHAMPS-Catherine", "MORTAMAIS-Elizabeth", "KOURNIATI-Marilena", "BENNOUNA-Zineb", "DOUTRIAUX-Emmanuel", "NGUYEN-Phuoc-Van-Anh", "TERRACOL-Pascal"], ["WACTA-Christine", "MARCOS-BOURHIS-Isabel", "HAMMOUDI-Toufik"], ["BASBOUS-Karim", "MAS-Jean", "TOUBANOS-Dimitri", "PELISSIER-Alain", "SALLES-Sylvie", "MORANDI-Christian", "BAILLY-Claire", "DEL-Andr\u00e9"]], "labels": ["nume\u0301rique, travail, patrimoine, pratique", "paris, patrimoine, ensa, recherche", "public, l'espace, sociale, espaces", "recherche, sie\u0300cle, l'architecture, architecture", "formes, architecturale, regard, l'architecture", "territoire, urbaine, culturelles, the\u0301orique", "projet, recherche, conception, urbaine"], "ax": null, "alpha_unsel": 0.0, "alpha_over": 1.2, "start_visible": [false, false, false, false, false, false, false]}, {"type": "toptoolbar"}]});
+   }(mpld3);
+}else if(typeof define === "function" && define.amd){
+   // require.js is available: use it to load d3/mpld3
+   require.config({paths: {d3: "https://d3js.org/d3.v5"}});
+   require(["d3"], function(d3){
+      window.d3 = d3;
+      mpld3_load_lib("https://mpld3.github.io/js/mpld3.v0.5.1.js", function(){
+         
+        mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+        HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+        HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+        HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+        HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                    hoffset:0,
+                                                    voffset:10};
+        function HtmlTooltipPlugin(fig, props){
+            mpld3.Plugin.call(this, fig, props);
+        };
+
+        HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var tooltip = d3.select("body").append("div")
+                        .attr("class", "mpld3-tooltip")
+                        .style("position", "absolute")
+                        .style("z-index", "10")
+                        .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                                tooltip.html(labels[i])
+                                        .style("visibility", "visible");})
+            .on("mousemove", function(d, i){
+                    tooltip
+                        .style("top", d3.event.pageY + this.props.voffset + "px")
+                        .style("left",d3.event.pageX + this.props.hoffset + "px");
+                    }.bind(this))
+            .on("mouseout",  function(d, i){
+                            tooltip.style("visibility", "hidden");});
+        };
+        
+        mpld3.register_plugin("interactive_legend", InteractiveLegend);
+        InteractiveLegend.prototype = Object.create(mpld3.Plugin.prototype);
+        InteractiveLegend.prototype.constructor = InteractiveLegend;
+        InteractiveLegend.prototype.requiredProps = ["element_ids", "labels","text"];
+        InteractiveLegend.prototype.defaultProps = {
+                                                    "ax":null,
+                                                    "alpha_unsel":0.2,
+                                                    "alpha_over":1.0,
+                                                    "start_visible":true}
+        function InteractiveLegend(fig, props){
+            mpld3.Plugin.call(this, fig, props);
+        };
+
+        InteractiveLegend.prototype.draw = function(){
+
+            var alpha_unsel = this.props.alpha_unsel;
+            var alpha_over = this.props.alpha_over;
+            var text = this.props.text;
+
+
+            var legendItems = new Array();
+            for(var i=0; i<this.props.labels.length; i++){
+                console.log(i);
+                var obj = {};
+                obj.label = this.props.labels[i];
+                var texte_cluster_choisi = text[i];
+
+                var element_id = this.props.element_ids[i];
+                console.log(element_id);
+                mpld3_elements = [];
+                _texts = [];
+                for(var j=0; j<element_id.length; j++){
+                    var mpld3_element = mpld3.get_element(element_id[j], this.fig);
+                    var objet = d3.select(mpld3_element);
+                    console.log(objet);
+ 
+                    // mpld3_element might be null in case of Line2D instances
+                    // for we pass the id for both the line and the markers. Either
+                    // one might not exist on the D3 side
+                    if(mpld3_element){
+                        mpld3_elements.push(mpld3_element);}
+                }
+                obj.mpld3_elements = mpld3_elements;
+                obj.visible = this.props.start_visible[i];
+                legendItems.push(obj);
+                set_alphas(obj, false);
+
+            }
+
+            // determine the axes with which this legend is associated
+            var ax = this.props.ax
+            if(!ax){
+                ax = this.fig.axes[0];
+            } else{
+                ax = mpld3.get_element(ax, this.fig);
+            }
+
+            // add a legend group to the canvas of the figure
+            var legend = this.fig.canvas.append("svg:g")
+                                .attr("class", "legend");
+
+            // add the rectangles
+            legend.selectAll("rect")
+                    .data(legendItems)
+                    .enter().append("rect")
+                    .attr("height", 10)
+                    .attr("width", 25)
+                    .attr("x", ax.width + ax.position[0] + 25)
+                    .attr("y",function(d,i) {
+                            return ax.position[1] + i * 25 + 10;})
+                    .attr("stroke", get_color)
+                    .attr("class", "legend-box")
+                    .style("fill", function(d, i) {
+                            return d.visible ? get_color(d) : "white";})
+                    .on("click", click).on('mouseover', over).on('mouseout', out);
+
+            // add the labels
+            legend.selectAll("text")
+                .data(legendItems)
+                .enter().append("text")
+                .attr("x", function (d) {
+                            return ax.width + ax.position[0] + 25 + 40;})
+                .attr("y", function(d,i) {
+                            return ax.position[1] + i * 25 + 10 + 10 - 1;})
+                .text(function(d) { return d.label });
+
+
+            // specify the action on click
+            function click(d,i){
+                d.visible = !d.visible;
+                d3.select(this)
+                .style("fill",function(d, i) {
+                    return d.visible ? get_color(d) : "white";
+                })
+                set_alphas(d, false);
+                var texte = text[i];
+                console.log(d);
+                var css = "mpld3-texte_" + d.label;
+                console.log(css);
+
+                for(var j=0; j<texte.length; j++){
+
+                    console.log(d.mpld3_elements[0]);
+                    console.log(texte[j]);
+                    var elem = d.mpld3_elements[0].pathsobj._groups[0];
+                    var coord = elem[j].getBoundingClientRect();
+
+                    if (d.visible == true) {
+                    var tooltip = (d3.select("body")).append("div")
+                        .attr("class", css )
+                        .style("position", "absolute")
+                        .style("z-index", "10")
+                        .style("visibility", "visible")
+                        .style("top", coord.top + "px")
+                        .style("left", coord.left + "px");
+
+                    tooltip.html(texte[j])
+                        .style("visibility", "visible");
+
+                    } else {
+                    
+                    var bod = d3.select("body")._groups[0];
+                    console.log(bod[0]);
+                    for (var i=0; i < bod[0].childNodes.length; i++) {
+                        if (bod[0].childNodes[i].className == css) {
+                            (bod[0].childNodes[i]).parentNode.removeChild(bod[0].childNodes[i]);
+                            }
+                        }
+
+                    }
+                    
+                }
+            };
+
+            // specify the action on legend overlay 
+            function over(d,i){
+                set_alphas(d, true);
+            };
+
+            // specify the action on legend overlay 
+            function out(d,i){
+                set_alphas(d, false);
+            };
+
+            // helper function for setting alphas
+            function set_alphas(d, is_over){
+                for(var i=0; i<d.mpld3_elements.length; i++){
+                    var type = d.mpld3_elements[i].constructor.name;
+
+                    if(type =="mpld3_Line"){
+                        var current_alpha = d.mpld3_elements[i].props.alpha;
+                        var current_alpha_unsel = current_alpha * alpha_unsel;
+                        var current_alpha_over = current_alpha * alpha_over;
+                        d3.select(d.mpld3_elements[i].path[0][0])
+                            .style("stroke-opacity", is_over ? current_alpha_over :
+                                                    (d.visible ? current_alpha : current_alpha_unsel))
+                            .style("stroke-width", is_over ? 
+                                    alpha_over * d.mpld3_elements[i].props.edgewidth : d.mpld3_elements[i].props.edgewidth);
+                    } else if((type=="mpld3_PathCollection")||
+                            (type=="mpld3_Markers")){
+                        var current_alpha = d.mpld3_elements[i].props.alphas[0];
+                        var current_alpha_unsel = current_alpha * alpha_unsel;
+                        var current_alpha_over = current_alpha * alpha_over;
+                        d3.selectAll(d.mpld3_elements[i].pathsobj[0])
+                            .style("stroke-opacity", is_over ? current_alpha_over :
+                                                    (d.visible ? current_alpha : current_alpha_unsel))
+                            .style("fill-opacity", is_over ? current_alpha_over :
+                                                    (d.visible ? current_alpha : current_alpha_unsel));
+                    
+                    } else{
+                        console.log(type + " not yet supported");
+                    }
+                }
+            };
+
+
+
+            // helper function for determining the color of the rectangles
+            function get_color(d){
+                var type = d.mpld3_elements[0].constructor.name;
+                var color = "black";
+                if(type =="mpld3_Line"){
+                    color = d.mpld3_elements[0].props.edgecolor;
+                } else if((type=="mpld3_PathCollection")||
+                        (type=="mpld3_Markers")){
+                    color = d.mpld3_elements[0].props.facecolors[0];
+                } else{
+                    console.log(type + " not yet supported");
+                }
+                return color;
+            };
+        };
+        
+        mpld3.register_plugin("toptoolbar", TopToolbar);
+        TopToolbar.prototype = Object.create(mpld3.Plugin.prototype);
+        TopToolbar.prototype.constructor = TopToolbar;
+        function TopToolbar(fig, props){mpld3.Plugin.call(this, fig, props);};
+
+        TopToolbar.prototype.draw = function(){
+        this.fig.toolbar.draw();
+
+        this.fig.toolbar.toolbar.attr("x", 0);
+        this.fig.toolbar.toolbar.attr("y", 0);
+        this.fig.toolbar.toolbar.attr("width", 48);
+        this.fig.toolbar.toolbar.attr("height", 16);
+
+        this.fig.toolbar.draw = function() {}
+        };
+        
+         mpld3.draw_figure("fig_el702171405661247997608579936862", {"width": 1700.0, "height": 900.0, "axes": [{"bbox": [0.125, 0.10999999999999999, 0.595, 0.77], "xlim": [-0.6862278710934453, 0.7552124011228327], "ylim": [-0.6073046831943085, 0.6369021347122589], "xdomain": [-0.6862278710934453, 0.7552124011228327], "ydomain": [-0.6073046831943085, 0.6369021347122589], "xscale": "linear", "yscale": "linear", "axes": [{"position": "bottom", "nticks": 9, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": false}, "visible": true}, {"position": "left", "nticks": 9, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": false}, "visible": true}], "axesbg": "#FFFFFF", "axesbgalpha": null, "zoomable": true, "id": "el70217140566141244496", "lines": [], "paths": [], "markers": [{"data": "data01", "xindex": 0, "yindex": 1, "coordinates": "data", "id": "el70217140566141243536pts", "facecolor": "#1F77B4", "edgecolor": "none", "edgewidth": 1.0, "alpha": 0.0, "zorder": 2, "markerpath": [[[0.0, 11.0], [2.9172341000000004, 11.0], [5.715378578633388, 9.840970607470659], [7.778174593052023, 7.778174593052023], [9.840970607470659, 5.715378578633388], [11.0, 2.9172341000000004], [11.0, 0.0], [11.0, -2.9172341000000004], [9.840970607470659, -5.715378578633388], [7.778174593052023, -7.778174593052023], [5.715378578633388, -9.840970607470659], [2.9172341000000004, -11.0], [0.0, -11.0], [-2.9172341000000004, -11.0], [-5.715378578633388, -9.840970607470659], [-7.778174593052023, -7.778174593052023], [-9.840970607470659, -5.715378578633388], [-11.0, -2.9172341000000004], [-11.0, 0.0], [-11.0, 2.9172341000000004], [-9.840970607470659, 5.715378578633388], [-7.778174593052023, 7.778174593052023], [-5.715378578633388, 9.840970607470659], [-2.9172341000000004, 11.0], [0.0, 11.0]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]}], "texts": [{"text": "Classification EVCAU - 2020-07-08", "position": [1.1999999999999997, 0.012025012025011994], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -0.0, "fontsize": 20.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el70217140566126633232"}], "collections": [{"offsets": "data02", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#A45DF5"], "facecolors": ["#A45DF5"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566139138768"}, {"offsets": "data03", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#E5F667"], "facecolors": ["#E5F667"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566139141840"}, {"offsets": "data04", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#62ECCD"], "facecolors": ["#62ECCD"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566133407440"}, {"offsets": "data05", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#7C8E6B"], "facecolors": ["#7C8E6B"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566133405200"}, {"offsets": "data06", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FC82A7"], "facecolors": ["#FC82A7"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566133404496"}, {"offsets": "data07", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#ECDDFC"], "facecolors": ["#ECDDFC"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566133404048"}, {"offsets": "data08", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#BBC2AE"], "facecolors": ["#BBC2AE"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566141191824"}], "images": [], "sharex": [], "sharey": []}], "data": {"data01": [[-0.555948014128237, 0.3507342285434967], [0.2773505994418768, 0.05659052427467041], [-0.1237185871837657, 0.33720991260506006], [0.5004148928279709, -0.24755479110552361], [-0.020819142254847003, -0.5671629143599791], [0.05601669856863247, 0.16013911265429365], [0.3077651626268636, -0.298491372439702], [-0.35658658491917744, 0.6211027646229581], [-0.5926093188760151, -0.37716066191794917], [0.13303712083019034, -0.06686399820848739], [0.1763394912100588, 0.20318544852074927], [-0.2836380153438952, 0.26680040499536584], [0.1460665320693181, -0.38766330714767644], [0.3320625441043341, -0.595106577136401], [0.1359901170638145, 0.41522157627298256], [-0.46126967483991904, -0.03543434555239886], [-0.1985824619749445, 0.06171479225868658], [-0.04512483165081455, -0.08029616676976563], [0.34760442247386975, 0.3863841318440809], [-0.23179220108267373, 0.5615682171384625], [0.29722921398662694, 0.2816095030858446], [-0.46214740276894983, 0.1892121647658625], [-0.6720961037187759, 0.2780667259058489], [0.5359750476086498, 0.1417297081360638], [0.14817536212201005, -0.5800738199725569], [-0.12531845859336418, -0.2185572959922941], [-0.5922344996470865, -0.25547549398328434], [0.3455934589919553, 0.1739141728081404], [-0.37110348507977736, -0.4360923245722785], [-0.04138943250006248, -0.2513819183142931], [-0.612591124602866, 0.00242592441923522], [0.045660441997407424, -0.3867647625078779], [-0.21138972761944694, -0.11516901719242821], [0.5614043312294508, -0.17126803715535743], [0.7410806337481634, -0.20854366517733647], [-0.24333605888257573, -0.46426639623058813], [0.02305316977456814, 0.5535302539818449], [0.4306348204970124, -0.5825122530009837], [0.3567772900063597, -0.10456390347375955], [0.5418011862203305, 0.3862200792853298], [-0.4039306718266726, 0.1319603851591827], [0.49231448060251304, 0.2426680790720506], [-0.14034598872245427, 0.4863567768502101], [-0.3905572836425239, -0.3477929397415481], [-0.27528490506575265, -0.34588058156654666], [0.18098075064626082, 0.6247040286543514], [0.2990397635946269, 0.5511324290529617], [-0.18417740635263397, -0.5727748135879908], [0.6057308475823009, 0.009933329068194564], [-0.42747752342432005, -0.18829017979171148], [0.005370524876388494, 0.41102686292279245]], "data02": [[-0.35658658491917744, 0.6211027646229581], [-0.23179220108267373, 0.5615682171384625], [0.5359750476086498, 0.1417297081360638], [0.02305316977456814, 0.5535302539818449], [0.49231448060251304, 0.2426680790720506], [0.18098075064626082, 0.6247040286543514]], "data03": [[-0.46214740276894983, 0.1892121647658625], [-0.37110348507977736, -0.4360923245722785], [-0.24333605888257573, -0.46426639623058813], [-0.4039306718266726, 0.1319603851591827], [-0.3905572836425239, -0.3477929397415481], [-0.27528490506575265, -0.34588058156654666]], "data04": [[-0.020819142254847003, -0.5671629143599791], [-0.5926093188760151, -0.37716066191794917], [-0.5922344996470865, -0.25547549398328434], [0.5614043312294508, -0.17126803715535743], [0.2990397635946269, 0.5511324290529617], [-0.42747752342432005, -0.18829017979171148]], "data05": [[-0.555948014128237, 0.3507342285434967], [0.1460665320693181, -0.38766330714767644], [-0.46126967483991904, -0.03543434555239886], [-0.612591124602866, 0.00242592441923522], [0.045660441997407424, -0.3867647625078779], [-0.21138972761944694, -0.11516901719242821], [-0.18417740635263397, -0.5727748135879908]], "data06": [[0.3077651626268636, -0.298491372439702], [0.13303712083019034, -0.06686399820848739], [-0.2836380153438952, 0.26680040499536584], [0.3320625441043341, -0.595106577136401], [0.1359901170638145, 0.41522157627298256], [-0.04512483165081455, -0.08029616676976563], [-0.6720961037187759, 0.2780667259058489], [0.14817536212201005, -0.5800738199725569], [-0.12531845859336418, -0.2185572959922941], [0.3455934589919553, 0.1739141728081404], [-0.04138943250006248, -0.2513819183142931], [0.4306348204970124, -0.5825122530009837], [0.3567772900063597, -0.10456390347375955], [-0.14034598872245427, 0.4863567768502101], [0.6057308475823009, 0.009933329068194564]], "data07": [[0.5004148928279709, -0.24755479110552361], [0.7410806337481634, -0.20854366517733647], [0.005370524876388494, 0.41102686292279245]], "data08": [[0.2773505994418768, 0.05659052427467041], [-0.1237185871837657, 0.33720991260506006], [0.05601669856863247, 0.16013911265429365], [0.1763394912100588, 0.20318544852074927], [-0.1985824619749445, 0.06171479225868658], [0.34760442247386975, 0.3863841318440809], [0.29722921398662694, 0.2816095030858446], [0.5418011862203305, 0.3862200792853298]]}, "id": "el70217140566124799760", "plugins": [{"type": "reset"}, {"type": "zoom", "button": true, "enabled": false}, {"type": "boxzoom", "button": true, "enabled": false}, {"type": "htmltooltip", "id": "el70217140566141243536pts", "labels": ["MAGERAND-Jean", "BASBOUS-Karim", "MAS-Jean", "WACTA-Christine", "EKIZOGLU-Esin", "TOUBANOS-Dimitri", "GALLE-Anne-Claire", "CELNIK-Olivier", "JEAN-JACQUES-Sarah", "CECCARINI-Patrice", "PELISSIER-Alain", "RASOLONIAINA-Louisette", "BRUCCULERI-Antonio", "BOTTIER-Patrick", "BOUTROS-Nader", "TRASI-Nicolleta", "SALLES-Sylvie", "GRUSON-Fran\u00e7ois", "MORANDI-Christian", "MEMET-S\u00e9bastien", "BAILLY-Claire", "NAFA-Chehrazade", "AUGER-Yann", "BOURBONNAIS-S\u00e9bastien", "CLEMENT-Caroline", "DESCHAMPS-Catherine", "MAAROUF-Nihal", "MORTAMAIS-Elizabeth", "BONNEAU-Lila-", "KOURNIATI-Marilena", "BLANCHI-Yann", "BELLAT-Fabien", "SEVERO-Donato", "GU\u00c9RIN-Philippe", "MARCOS-BOURHIS-Isabel", "PROTH-Bruno", "BOUET-Olivier", "BENNOUNA-Zineb", "DOUTRIAUX-Emmanuel", "DEL-Andr\u00e9", "GILLOT-Laurence", "SERERO-David", "NGUYEN-Phuoc-Van-Anh", "LANGLOIS-Gilles-Antoine", "GAIMARD-Marie", "CHOPIN-Frank", "WURTZ-Dominique", "BERNARD-Marc", "TERRACOL-Pascal", "GAISSAD-Laurent", "HAMMOUDI-Toufik"], "hoffset": 1, "voffset": 1}, {"type": "interactive_legend", "element_ids": [["el70217140566139138768"], ["el70217140566139141840"], ["el70217140566133407440"], ["el70217140566133405200"], ["el70217140566133404496"], ["el70217140566133404048"], ["el70217140566141191824"]], "text": [["CELNIK-Olivier", "MEMET-S\u00e9bastien", "BOURBONNAIS-S\u00e9bastien", "BOUET-Olivier", "SERERO-David", "CHOPIN-Frank"], ["NAFA-Chehrazade", "BONNEAU-Lila-", "PROTH-Bruno", "GILLOT-Laurence", "LANGLOIS-Gilles-Antoine", "GAIMARD-Marie"], ["EKIZOGLU-Esin", "JEAN-JACQUES-Sarah", "MAAROUF-Nihal", "GU\u00c9RIN-Philippe", "WURTZ-Dominique", "GAISSAD-Laurent"], ["MAGERAND-Jean", "BRUCCULERI-Antonio", "TRASI-Nicolleta", "BLANCHI-Yann", "BELLAT-Fabien", "SEVERO-Donato", "BERNARD-Marc"], ["GALLE-Anne-Claire", "CECCARINI-Patrice", "RASOLONIAINA-Louisette", "BOTTIER-Patrick", "BOUTROS-Nader", "GRUSON-Fran\u00e7ois", "AUGER-Yann", "CLEMENT-Caroline", "DESCHAMPS-Catherine", "MORTAMAIS-Elizabeth", "KOURNIATI-Marilena", "BENNOUNA-Zineb", "DOUTRIAUX-Emmanuel", "NGUYEN-Phuoc-Van-Anh", "TERRACOL-Pascal"], ["WACTA-Christine", "MARCOS-BOURHIS-Isabel", "HAMMOUDI-Toufik"], ["BASBOUS-Karim", "MAS-Jean", "TOUBANOS-Dimitri", "PELISSIER-Alain", "SALLES-Sylvie", "MORANDI-Christian", "BAILLY-Claire", "DEL-Andr\u00e9"]], "labels": ["nume\u0301rique, travail, patrimoine, pratique", "paris, patrimoine, ensa, recherche", "public, l'espace, sociale, espaces", "recherche, sie\u0300cle, l'architecture, architecture", "formes, architecturale, regard, l'architecture", "territoire, urbaine, culturelles, the\u0301orique", "projet, recherche, conception, urbaine"], "ax": null, "alpha_unsel": 0.0, "alpha_over": 1.2, "start_visible": [false, false, false, false, false, false, false]}, {"type": "toptoolbar"}]});
+      });
+    });
+}else{
+    // require.js not available: dynamically load d3 & mpld3
+    mpld3_load_lib("https://d3js.org/d3.v5.js", function(){
+         mpld3_load_lib("https://mpld3.github.io/js/mpld3.v0.5.1.js", function(){
+                 
+        mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+        HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+        HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+        HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+        HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                    hoffset:0,
+                                                    voffset:10};
+        function HtmlTooltipPlugin(fig, props){
+            mpld3.Plugin.call(this, fig, props);
+        };
+
+        HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var tooltip = d3.select("body").append("div")
+                        .attr("class", "mpld3-tooltip")
+                        .style("position", "absolute")
+                        .style("z-index", "10")
+                        .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                                tooltip.html(labels[i])
+                                        .style("visibility", "visible");})
+            .on("mousemove", function(d, i){
+                    tooltip
+                        .style("top", d3.event.pageY + this.props.voffset + "px")
+                        .style("left",d3.event.pageX + this.props.hoffset + "px");
+                    }.bind(this))
+            .on("mouseout",  function(d, i){
+                            tooltip.style("visibility", "hidden");});
+        };
+        
+        mpld3.register_plugin("interactive_legend", InteractiveLegend);
+        InteractiveLegend.prototype = Object.create(mpld3.Plugin.prototype);
+        InteractiveLegend.prototype.constructor = InteractiveLegend;
+        InteractiveLegend.prototype.requiredProps = ["element_ids", "labels","text"];
+        InteractiveLegend.prototype.defaultProps = {
+                                                    "ax":null,
+                                                    "alpha_unsel":0.2,
+                                                    "alpha_over":1.0,
+                                                    "start_visible":true}
+        function InteractiveLegend(fig, props){
+            mpld3.Plugin.call(this, fig, props);
+        };
+
+        InteractiveLegend.prototype.draw = function(){
+
+            var alpha_unsel = this.props.alpha_unsel;
+            var alpha_over = this.props.alpha_over;
+            var text = this.props.text;
+
+
+            var legendItems = new Array();
+            for(var i=0; i<this.props.labels.length; i++){
+                console.log(i);
+                var obj = {};
+                obj.label = this.props.labels[i];
+                var texte_cluster_choisi = text[i];
+
+                var element_id = this.props.element_ids[i];
+                console.log(element_id);
+                mpld3_elements = [];
+                _texts = [];
+                for(var j=0; j<element_id.length; j++){
+                    var mpld3_element = mpld3.get_element(element_id[j], this.fig);
+                    var objet = d3.select(mpld3_element);
+                    console.log(objet);
+ 
+                    // mpld3_element might be null in case of Line2D instances
+                    // for we pass the id for both the line and the markers. Either
+                    // one might not exist on the D3 side
+                    if(mpld3_element){
+                        mpld3_elements.push(mpld3_element);}
+                }
+                obj.mpld3_elements = mpld3_elements;
+                obj.visible = this.props.start_visible[i];
+                legendItems.push(obj);
+                set_alphas(obj, false);
+
+            }
+
+            // determine the axes with which this legend is associated
+            var ax = this.props.ax
+            if(!ax){
+                ax = this.fig.axes[0];
+            } else{
+                ax = mpld3.get_element(ax, this.fig);
+            }
+
+            // add a legend group to the canvas of the figure
+            var legend = this.fig.canvas.append("svg:g")
+                                .attr("class", "legend");
+
+            // add the rectangles
+            legend.selectAll("rect")
+                    .data(legendItems)
+                    .enter().append("rect")
+                    .attr("height", 10)
+                    .attr("width", 25)
+                    .attr("x", ax.width + ax.position[0] + 25)
+                    .attr("y",function(d,i) {
+                            return ax.position[1] + i * 25 + 10;})
+                    .attr("stroke", get_color)
+                    .attr("class", "legend-box")
+                    .style("fill", function(d, i) {
+                            return d.visible ? get_color(d) : "white";})
+                    .on("click", click).on('mouseover', over).on('mouseout', out);
+
+            // add the labels
+            legend.selectAll("text")
+                .data(legendItems)
+                .enter().append("text")
+                .attr("x", function (d) {
+                            return ax.width + ax.position[0] + 25 + 40;})
+                .attr("y", function(d,i) {
+                            return ax.position[1] + i * 25 + 10 + 10 - 1;})
+                .text(function(d) { return d.label });
+
+
+            // specify the action on click
+            function click(d,i){
+                d.visible = !d.visible;
+                d3.select(this)
+                .style("fill",function(d, i) {
+                    return d.visible ? get_color(d) : "white";
+                })
+                set_alphas(d, false);
+                var texte = text[i];
+                console.log(d);
+                var css = "mpld3-texte_" + d.label;
+                console.log(css);
+
+                for(var j=0; j<texte.length; j++){
+
+                    console.log(d.mpld3_elements[0]);
+                    console.log(texte[j]);
+                    var elem = d.mpld3_elements[0].pathsobj._groups[0];
+                    var coord = elem[j].getBoundingClientRect();
+
+                    if (d.visible == true) {
+                    var tooltip = (d3.select("body")).append("div")
+                        .attr("class", css )
+                        .style("position", "absolute")
+                        .style("z-index", "10")
+                        .style("visibility", "visible")
+                        .style("top", coord.top + "px")
+                        .style("left", coord.left + "px");
+
+                    tooltip.html(texte[j])
+                        .style("visibility", "visible");
+
+                    } else {
+                    
+                    var bod = d3.select("body")._groups[0];
+                    console.log(bod[0]);
+                    for (var i=0; i < bod[0].childNodes.length; i++) {
+                        if (bod[0].childNodes[i].className == css) {
+                            (bod[0].childNodes[i]).parentNode.removeChild(bod[0].childNodes[i]);
+                            }
+                        }
+
+                    }
+                    
+                }
+            };
+
+            // specify the action on legend overlay 
+            function over(d,i){
+                set_alphas(d, true);
+            };
+
+            // specify the action on legend overlay 
+            function out(d,i){
+                set_alphas(d, false);
+            };
+
+            // helper function for setting alphas
+            function set_alphas(d, is_over){
+                for(var i=0; i<d.mpld3_elements.length; i++){
+                    var type = d.mpld3_elements[i].constructor.name;
+
+                    if(type =="mpld3_Line"){
+                        var current_alpha = d.mpld3_elements[i].props.alpha;
+                        var current_alpha_unsel = current_alpha * alpha_unsel;
+                        var current_alpha_over = current_alpha * alpha_over;
+                        d3.select(d.mpld3_elements[i].path[0][0])
+                            .style("stroke-opacity", is_over ? current_alpha_over :
+                                                    (d.visible ? current_alpha : current_alpha_unsel))
+                            .style("stroke-width", is_over ? 
+                                    alpha_over * d.mpld3_elements[i].props.edgewidth : d.mpld3_elements[i].props.edgewidth);
+                    } else if((type=="mpld3_PathCollection")||
+                            (type=="mpld3_Markers")){
+                        var current_alpha = d.mpld3_elements[i].props.alphas[0];
+                        var current_alpha_unsel = current_alpha * alpha_unsel;
+                        var current_alpha_over = current_alpha * alpha_over;
+                        d3.selectAll(d.mpld3_elements[i].pathsobj[0])
+                            .style("stroke-opacity", is_over ? current_alpha_over :
+                                                    (d.visible ? current_alpha : current_alpha_unsel))
+                            .style("fill-opacity", is_over ? current_alpha_over :
+                                                    (d.visible ? current_alpha : current_alpha_unsel));
+                    
+                    } else{
+                        console.log(type + " not yet supported");
+                    }
+                }
+            };
+
+
+
+            // helper function for determining the color of the rectangles
+            function get_color(d){
+                var type = d.mpld3_elements[0].constructor.name;
+                var color = "black";
+                if(type =="mpld3_Line"){
+                    color = d.mpld3_elements[0].props.edgecolor;
+                } else if((type=="mpld3_PathCollection")||
+                        (type=="mpld3_Markers")){
+                    color = d.mpld3_elements[0].props.facecolors[0];
+                } else{
+                    console.log(type + " not yet supported");
+                }
+                return color;
+            };
+        };
+        
+        mpld3.register_plugin("toptoolbar", TopToolbar);
+        TopToolbar.prototype = Object.create(mpld3.Plugin.prototype);
+        TopToolbar.prototype.constructor = TopToolbar;
+        function TopToolbar(fig, props){mpld3.Plugin.call(this, fig, props);};
+
+        TopToolbar.prototype.draw = function(){
+        this.fig.toolbar.draw();
+
+        this.fig.toolbar.toolbar.attr("x", 0);
+        this.fig.toolbar.toolbar.attr("y", 0);
+        this.fig.toolbar.toolbar.attr("width", 48);
+        this.fig.toolbar.toolbar.attr("height", 16);
+
+        this.fig.toolbar.draw = function() {}
+        };
+        
+                 mpld3.draw_figure("fig_el702171405661247997608579936862", {"width": 1700.0, "height": 900.0, "axes": [{"bbox": [0.125, 0.10999999999999999, 0.595, 0.77], "xlim": [-0.6862278710934453, 0.7552124011228327], "ylim": [-0.6073046831943085, 0.6369021347122589], "xdomain": [-0.6862278710934453, 0.7552124011228327], "ydomain": [-0.6073046831943085, 0.6369021347122589], "xscale": "linear", "yscale": "linear", "axes": [{"position": "bottom", "nticks": 9, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": false}, "visible": true}, {"position": "left", "nticks": 9, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": false}, "visible": true}], "axesbg": "#FFFFFF", "axesbgalpha": null, "zoomable": true, "id": "el70217140566141244496", "lines": [], "paths": [], "markers": [{"data": "data01", "xindex": 0, "yindex": 1, "coordinates": "data", "id": "el70217140566141243536pts", "facecolor": "#1F77B4", "edgecolor": "none", "edgewidth": 1.0, "alpha": 0.0, "zorder": 2, "markerpath": [[[0.0, 11.0], [2.9172341000000004, 11.0], [5.715378578633388, 9.840970607470659], [7.778174593052023, 7.778174593052023], [9.840970607470659, 5.715378578633388], [11.0, 2.9172341000000004], [11.0, 0.0], [11.0, -2.9172341000000004], [9.840970607470659, -5.715378578633388], [7.778174593052023, -7.778174593052023], [5.715378578633388, -9.840970607470659], [2.9172341000000004, -11.0], [0.0, -11.0], [-2.9172341000000004, -11.0], [-5.715378578633388, -9.840970607470659], [-7.778174593052023, -7.778174593052023], [-9.840970607470659, -5.715378578633388], [-11.0, -2.9172341000000004], [-11.0, 0.0], [-11.0, 2.9172341000000004], [-9.840970607470659, 5.715378578633388], [-7.778174593052023, 7.778174593052023], [-5.715378578633388, 9.840970607470659], [-2.9172341000000004, 11.0], [0.0, 11.0]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]}], "texts": [{"text": "Classification EVCAU - 2020-07-08", "position": [1.1999999999999997, 0.012025012025011994], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -0.0, "fontsize": 20.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el70217140566126633232"}], "collections": [{"offsets": "data02", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#A45DF5"], "facecolors": ["#A45DF5"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566139138768"}, {"offsets": "data03", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#E5F667"], "facecolors": ["#E5F667"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566139141840"}, {"offsets": "data04", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#62ECCD"], "facecolors": ["#62ECCD"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566133407440"}, {"offsets": "data05", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#7C8E6B"], "facecolors": ["#7C8E6B"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566133405200"}, {"offsets": "data06", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FC82A7"], "facecolors": ["#FC82A7"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566133404496"}, {"offsets": "data07", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#ECDDFC"], "facecolors": ["#ECDDFC"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566133404048"}, {"offsets": "data08", "xindex": 0, "yindex": 1, "paths": [[[[0.0, -0.5], [0.13260155, -0.5], [0.25978993539242673, -0.44731684579412084], [0.3535533905932738, -0.3535533905932738], [0.44731684579412084, -0.25978993539242673], [0.5, -0.13260155], [0.5, 0.0], [0.5, 0.13260155], [0.44731684579412084, 0.25978993539242673], [0.3535533905932738, 0.3535533905932738], [0.25978993539242673, 0.44731684579412084], [0.13260155, 0.5], [0.0, 0.5], [-0.13260155, 0.5], [-0.25978993539242673, 0.44731684579412084], [-0.3535533905932738, 0.3535533905932738], [-0.44731684579412084, 0.25978993539242673], [-0.5, 0.13260155], [-0.5, 0.0], [-0.5, -0.13260155], [-0.44731684579412084, -0.25978993539242673], [-0.3535533905932738, -0.3535533905932738], [-0.25978993539242673, -0.44731684579412084], [-0.13260155, -0.5], [0.0, -0.5]], ["M", "C", "C", "C", "C", "C", "C", "C", "C", "Z"]]], "pathtransforms": [[17.010345435994292, 0.0, 0.0, 17.010345435994292, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#BBC2AE"], "facecolors": ["#BBC2AE"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 1, "id": "el70217140566141191824"}], "images": [], "sharex": [], "sharey": []}], "data": {"data01": [[-0.555948014128237, 0.3507342285434967], [0.2773505994418768, 0.05659052427467041], [-0.1237185871837657, 0.33720991260506006], [0.5004148928279709, -0.24755479110552361], [-0.020819142254847003, -0.5671629143599791], [0.05601669856863247, 0.16013911265429365], [0.3077651626268636, -0.298491372439702], [-0.35658658491917744, 0.6211027646229581], [-0.5926093188760151, -0.37716066191794917], [0.13303712083019034, -0.06686399820848739], [0.1763394912100588, 0.20318544852074927], [-0.2836380153438952, 0.26680040499536584], [0.1460665320693181, -0.38766330714767644], [0.3320625441043341, -0.595106577136401], [0.1359901170638145, 0.41522157627298256], [-0.46126967483991904, -0.03543434555239886], [-0.1985824619749445, 0.06171479225868658], [-0.04512483165081455, -0.08029616676976563], [0.34760442247386975, 0.3863841318440809], [-0.23179220108267373, 0.5615682171384625], [0.29722921398662694, 0.2816095030858446], [-0.46214740276894983, 0.1892121647658625], [-0.6720961037187759, 0.2780667259058489], [0.5359750476086498, 0.1417297081360638], [0.14817536212201005, -0.5800738199725569], [-0.12531845859336418, -0.2185572959922941], [-0.5922344996470865, -0.25547549398328434], [0.3455934589919553, 0.1739141728081404], [-0.37110348507977736, -0.4360923245722785], [-0.04138943250006248, -0.2513819183142931], [-0.612591124602866, 0.00242592441923522], [0.045660441997407424, -0.3867647625078779], [-0.21138972761944694, -0.11516901719242821], [0.5614043312294508, -0.17126803715535743], [0.7410806337481634, -0.20854366517733647], [-0.24333605888257573, -0.46426639623058813], [0.02305316977456814, 0.5535302539818449], [0.4306348204970124, -0.5825122530009837], [0.3567772900063597, -0.10456390347375955], [0.5418011862203305, 0.3862200792853298], [-0.4039306718266726, 0.1319603851591827], [0.49231448060251304, 0.2426680790720506], [-0.14034598872245427, 0.4863567768502101], [-0.3905572836425239, -0.3477929397415481], [-0.27528490506575265, -0.34588058156654666], [0.18098075064626082, 0.6247040286543514], [0.2990397635946269, 0.5511324290529617], [-0.18417740635263397, -0.5727748135879908], [0.6057308475823009, 0.009933329068194564], [-0.42747752342432005, -0.18829017979171148], [0.005370524876388494, 0.41102686292279245]], "data02": [[-0.35658658491917744, 0.6211027646229581], [-0.23179220108267373, 0.5615682171384625], [0.5359750476086498, 0.1417297081360638], [0.02305316977456814, 0.5535302539818449], [0.49231448060251304, 0.2426680790720506], [0.18098075064626082, 0.6247040286543514]], "data03": [[-0.46214740276894983, 0.1892121647658625], [-0.37110348507977736, -0.4360923245722785], [-0.24333605888257573, -0.46426639623058813], [-0.4039306718266726, 0.1319603851591827], [-0.3905572836425239, -0.3477929397415481], [-0.27528490506575265, -0.34588058156654666]], "data04": [[-0.020819142254847003, -0.5671629143599791], [-0.5926093188760151, -0.37716066191794917], [-0.5922344996470865, -0.25547549398328434], [0.5614043312294508, -0.17126803715535743], [0.2990397635946269, 0.5511324290529617], [-0.42747752342432005, -0.18829017979171148]], "data05": [[-0.555948014128237, 0.3507342285434967], [0.1460665320693181, -0.38766330714767644], [-0.46126967483991904, -0.03543434555239886], [-0.612591124602866, 0.00242592441923522], [0.045660441997407424, -0.3867647625078779], [-0.21138972761944694, -0.11516901719242821], [-0.18417740635263397, -0.5727748135879908]], "data06": [[0.3077651626268636, -0.298491372439702], [0.13303712083019034, -0.06686399820848739], [-0.2836380153438952, 0.26680040499536584], [0.3320625441043341, -0.595106577136401], [0.1359901170638145, 0.41522157627298256], [-0.04512483165081455, -0.08029616676976563], [-0.6720961037187759, 0.2780667259058489], [0.14817536212201005, -0.5800738199725569], [-0.12531845859336418, -0.2185572959922941], [0.3455934589919553, 0.1739141728081404], [-0.04138943250006248, -0.2513819183142931], [0.4306348204970124, -0.5825122530009837], [0.3567772900063597, -0.10456390347375955], [-0.14034598872245427, 0.4863567768502101], [0.6057308475823009, 0.009933329068194564]], "data07": [[0.5004148928279709, -0.24755479110552361], [0.7410806337481634, -0.20854366517733647], [0.005370524876388494, 0.41102686292279245]], "data08": [[0.2773505994418768, 0.05659052427467041], [-0.1237185871837657, 0.33720991260506006], [0.05601669856863247, 0.16013911265429365], [0.1763394912100588, 0.20318544852074927], [-0.1985824619749445, 0.06171479225868658], [0.34760442247386975, 0.3863841318440809], [0.29722921398662694, 0.2816095030858446], [0.5418011862203305, 0.3862200792853298]]}, "id": "el70217140566124799760", "plugins": [{"type": "reset"}, {"type": "zoom", "button": true, "enabled": false}, {"type": "boxzoom", "button": true, "enabled": false}, {"type": "htmltooltip", "id": "el70217140566141243536pts", "labels": ["MAGERAND-Jean", "BASBOUS-Karim", "MAS-Jean", "WACTA-Christine", "EKIZOGLU-Esin", "TOUBANOS-Dimitri", "GALLE-Anne-Claire", "CELNIK-Olivier", "JEAN-JACQUES-Sarah", "CECCARINI-Patrice", "PELISSIER-Alain", "RASOLONIAINA-Louisette", "BRUCCULERI-Antonio", "BOTTIER-Patrick", "BOUTROS-Nader", "TRASI-Nicolleta", "SALLES-Sylvie", "GRUSON-Fran\u00e7ois", "MORANDI-Christian", "MEMET-S\u00e9bastien", "BAILLY-Claire", "NAFA-Chehrazade", "AUGER-Yann", "BOURBONNAIS-S\u00e9bastien", "CLEMENT-Caroline", "DESCHAMPS-Catherine", "MAAROUF-Nihal", "MORTAMAIS-Elizabeth", "BONNEAU-Lila-", "KOURNIATI-Marilena", "BLANCHI-Yann", "BELLAT-Fabien", "SEVERO-Donato", "GU\u00c9RIN-Philippe", "MARCOS-BOURHIS-Isabel", "PROTH-Bruno", "BOUET-Olivier", "BENNOUNA-Zineb", "DOUTRIAUX-Emmanuel", "DEL-Andr\u00e9", "GILLOT-Laurence", "SERERO-David", "NGUYEN-Phuoc-Van-Anh", "LANGLOIS-Gilles-Antoine", "GAIMARD-Marie", "CHOPIN-Frank", "WURTZ-Dominique", "BERNARD-Marc", "TERRACOL-Pascal", "GAISSAD-Laurent", "HAMMOUDI-Toufik"], "hoffset": 1, "voffset": 1}, {"type": "interactive_legend", "element_ids": [["el70217140566139138768"], ["el70217140566139141840"], ["el70217140566133407440"], ["el70217140566133405200"], ["el70217140566133404496"], ["el70217140566133404048"], ["el70217140566141191824"]], "text": [["CELNIK-Olivier", "MEMET-S\u00e9bastien", "BOURBONNAIS-S\u00e9bastien", "BOUET-Olivier", "SERERO-David", "CHOPIN-Frank"], ["NAFA-Chehrazade", "BONNEAU-Lila-", "PROTH-Bruno", "GILLOT-Laurence", "LANGLOIS-Gilles-Antoine", "GAIMARD-Marie"], ["EKIZOGLU-Esin", "JEAN-JACQUES-Sarah", "MAAROUF-Nihal", "GU\u00c9RIN-Philippe", "WURTZ-Dominique", "GAISSAD-Laurent"], ["MAGERAND-Jean", "BRUCCULERI-Antonio", "TRASI-Nicolleta", "BLANCHI-Yann", "BELLAT-Fabien", "SEVERO-Donato", "BERNARD-Marc"], ["GALLE-Anne-Claire", "CECCARINI-Patrice", "RASOLONIAINA-Louisette", "BOTTIER-Patrick", "BOUTROS-Nader", "GRUSON-Fran\u00e7ois", "AUGER-Yann", "CLEMENT-Caroline", "DESCHAMPS-Catherine", "MORTAMAIS-Elizabeth", "KOURNIATI-Marilena", "BENNOUNA-Zineb", "DOUTRIAUX-Emmanuel", "NGUYEN-Phuoc-Van-Anh", "TERRACOL-Pascal"], ["WACTA-Christine", "MARCOS-BOURHIS-Isabel", "HAMMOUDI-Toufik"], ["BASBOUS-Karim", "MAS-Jean", "TOUBANOS-Dimitri", "PELISSIER-Alain", "SALLES-Sylvie", "MORANDI-Christian", "BAILLY-Claire", "DEL-Andr\u00e9"]], "labels": ["nume\u0301rique, travail, patrimoine, pratique", "paris, patrimoine, ensa, recherche", "public, l'espace, sociale, espaces", "recherche, sie\u0300cle, l'architecture, architecture", "formes, architecturale, regard, l'architecture", "territoire, urbaine, culturelles, the\u0301orique", "projet, recherche, conception, urbaine"], "ax": null, "alpha_unsel": 0.0, "alpha_over": 1.2, "start_visible": [false, false, false, false, false, false, false]}, {"type": "toptoolbar"}]});
+            })
+         });
+}
+</script>

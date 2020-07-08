@@ -1,4 +1,4 @@
-# NLPvs (06/07/2020 Update)
+# NLPvs (08/07/2020 Update)
 
 <h2>About NLPvs</h2>
 
@@ -27,6 +27,7 @@ NLPvs is a WIP student project aimed to classify a large ammount of text from PD
   <li>Added the ability to make a model use the CUDA cores (user defined option)</li>
   <li>Replaced the .PNG result graph with a .HTML file</li>
   <li>Added the ability to parse HTML files (saved in a local folder)</li>
+  <li>Added the ability to give a proper name for both the file and the title of the graph</li>
 </ul>
 
 <h3>Interface</h3>
@@ -54,6 +55,7 @@ NLPvs is a WIP student project aimed to classify a large ammount of text from PD
   <li><a href=https://github.com/rapidsai/cuml>CuML</a> a library which provides CUDA Accelerated ML algorithms</li>
   <li><a href=https://github.com/ClaudeCoulombe/FrenchLefffLemmatizer>FrenchLefffLemmatizer</a> a lemmatizer for french language</li>
   <li><a href=https://www.crummy.com/software/BeautifulSoup/bs4/doc/#>Beautiful Soup</a> a html parsing library</li>
+  <li><a href=https://mpld3.github.io/>MplD3</a>A complementary module for matplotlib using D3.js visualization</li>
   <li>another folder in the same directory as the source code to dump all the PDF files to classify</li>
   <li>Some test PDF files (to test the classification)</li>
 </ul>

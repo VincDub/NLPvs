@@ -22,6 +22,8 @@ from PIL import Image, ImageTk
 import numpy as np
 from bs4 import BeautifulSoup
 import codecs
+import collections
+import shutil
 
 import nltk
 from nltk import tokenize
@@ -39,6 +41,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import mpld3
+from mpld3.utils import get_id
 
 #import cuml.cluster as cucl
 
@@ -46,6 +49,34 @@ try:
     import cuml.cluster as cucl
 except ImportError:
     cucl = None
+
+#### POUR JS
+
+'''
+def html_id_ok(objid, html5=False):
+    """Check whether objid is valid as an HTML id attribute.
+    If html5 == True, then use the more liberal html5 rules.
+    """
+    if html5:
+        return not re.search('\s', objid)
+    else:
+        return bool(re.match("^[a-zA-Z][a-zA-Z0-9\-\.\:\_]*$", objid))
+
+
+def get_id(obj, suffix="", prefix="el", warn_on_invalid=True):
+    """Get a unique id for the object"""
+    if not suffix:
+        suffix = ""
+    if not prefix:
+        prefix = ""
+
+    objid = prefix + str(os.getpid()) + str(id(obj)) + suffix
+
+    if warn_on_invalid and not html_id_ok(objid):
+        warnings.warn('"{0}" is not a valid html ID. This may cause problems')
+
+    return objid
+'''
 
 ### GENERATION COULEURS ALEATOIRES LES PLUS DISTINCTES POSSIBLE
 
@@ -90,7 +121,7 @@ def nettoyage_sans_phrases(txt):
         texte = "".join(texte.splitlines())
         texte = unicodedata.normalize('NFD', texte).encode('utf-8', 'ignore').decode('utf-8', 'ignore')
         texte = texte.lower()
-        rm_ponctuation = str.maketrans('','', string.punctuation)
+        rm_ponctuation = str.maketrans(string.punctuation, " "*len(string.punctuation))
         texte = texte.translate(rm_ponctuation)
         texte = "".join([i for i in texte if not i.isdigit()]) ## SUPPRESSION DES CHIFFRES
         texte = re.sub(u'\u2019',u"\u0027", texte)
@@ -162,7 +193,6 @@ def token_sans_racin_pour_tfidf(txt):
     for ligne in f.readlines():
 
         stop_words.append(ligne[:-1])
-
 
     tk = [mot for mot in txt.split() if (len(mot)>3) and (mot not in stop_words)]
 
@@ -310,11 +340,15 @@ def preprocess_html_masse(dir):
         markup = codecs.open(nom, 'r', 'utf-8')
         doc = BeautifulSoup(markup,features="html.parser")
 
-        resume = doc.find(id="comp-jrkv04r5") ## Spécfique à une tâche de classement définie
+        '''
+        ## Spécfique au classement de l'EVCAU
+
+        resume = doc.find(id="comp-jrkv04r5")
+        ''' 
 
         texte_p = ""
 
-        paragraphes = resume.find_all('p')
+        paragraphes = doc.find_all('p')
 
         for pa in paragraphes:
 
@@ -467,7 +501,7 @@ def entrainer_depuis_corpus(dir_src,n,gpu,pdf):
 
     vocab = pd.DataFrame({'words': ss_racin}, index = racin)
 
-    tfconv = TfidfVectorizer(input = 'content',max_df=0.8, min_df=0.2,max_features = 9000000,ngram_range=(1,3), token_pattern=None,analyzer='word',preprocessor=None,lowercase=False, tokenizer=token_pour_tfidf).fit(sac2)
+    tfconv = TfidfVectorizer(input = 'content',max_df=0.8, min_df=0.2,max_features = 9000000, token_pattern=None,analyzer='word',preprocessor=None,lowercase=False, tokenizer=token_pour_tfidf).fit(sac2)
     corpus_vect = tfconv.transform(sac2)
 
     if gpu == False:
@@ -650,12 +684,15 @@ def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu,pdf):
     return resultat_class , delta_t, modele, termes, vocab, resultat_matrix, labels_cl,noms
 
 
-def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool,pdf_bool):
+def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool,pdf_bool,nm):
+
+    pdf_bool = pdf_bool.get()
 
     dir_test = test.cget("text")
     dir_mdl = mdl.cget("text")
     n_cl = int()
     dir_src = str()
+    nom_perso = nm.get()
 
     train = entrain.get()
 
@@ -686,14 +723,14 @@ def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool,pdf_bool):
 
             liste_index.append(resultat[1])
 
-        graph = produire_graph_2d(result[5],result_clusters,liste_index,result[7],frame,pdf)
+        graph = produire_graph_2d(result[5],result_clusters,liste_index,result[7],frame,pdf_bool,nom_perso)
 
         
         
     else:
 
         n_cl = int(n.get())
-        dir_src = src.cget("text")
+        dir_src = test.cget("text")
 
         result = tester_texte(dir_src,dir_test,n_cl,entrainer=True,dir_model=dir_mdl,gpu = gpu_bool, pdf = pdf_bool)
 
@@ -718,7 +755,7 @@ def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool,pdf_bool):
 
             liste_index.append(resultat[1])
 
-        graph = produire_graph_2d(result[5],result_clusters,liste_index,result[7],frame,pdf)
+        graph = produire_graph_2d(result[5],result_clusters,liste_index,result[7],frame,pdf_bool,nom_perso)
 
     msg = 'Graph exporté sous :' + graph
 
@@ -747,7 +784,6 @@ def clusters_en_features(mdl,n,termes,vocab):
 
             term_ind = tm[ind]
 
-
             mot = (vocab.at[term_ind,'words'])[0]
             
             mots_par_clusters.append(mot)
@@ -757,11 +793,15 @@ def clusters_en_features(mdl,n,termes,vocab):
     return clusters_dict
 
 
-def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,frame_log,pdf):
+def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,frame_log,pdf,nom):
 
-    ## CONVERSION DATA EN 2D
+    nom_perso = nom
+
+    ## DISTANCE COSINUS
 
     distance = 1 - cosine_similarity(matrix)
+
+    ## REDUCTION MULTIDIMENSIONELLE VERS 2 DIMENSIONS
 
     MDS()
 
@@ -802,8 +842,341 @@ def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,f
 
             noms_docs.append(nom_solo)
 
+    class InteractiveLegendPluginTxt(mpld3.plugins.PluginBase):
+
+
+       #Modifié pour ajouter un paramètre d'affichage de texte
+
+
+        JAVASCRIPT = """
+        mpld3.register_plugin("interactive_legend", InteractiveLegend);
+        InteractiveLegend.prototype = Object.create(mpld3.Plugin.prototype);
+        InteractiveLegend.prototype.constructor = InteractiveLegend;
+        InteractiveLegend.prototype.requiredProps = ["element_ids", "labels","text"];
+        InteractiveLegend.prototype.defaultProps = {
+                                                    "ax":null,
+                                                    "alpha_unsel":0.2,
+                                                    "alpha_over":1.0,
+                                                    "start_visible":true}
+        function InteractiveLegend(fig, props){
+            mpld3.Plugin.call(this, fig, props);
+        };
+
+        InteractiveLegend.prototype.draw = function(){
+
+            var alpha_unsel = this.props.alpha_unsel;
+            var alpha_over = this.props.alpha_over;
+            var text = this.props.text;
+
+
+            var legendItems = new Array();
+            for(var i=0; i<this.props.labels.length; i++){
+                console.log(i);
+                var obj = {};
+                obj.label = this.props.labels[i];
+                var texte_cluster_choisi = text[i];
+
+                var element_id = this.props.element_ids[i];
+                console.log(element_id);
+                mpld3_elements = [];
+                _texts = [];
+                for(var j=0; j<element_id.length; j++){
+                    var mpld3_element = mpld3.get_element(element_id[j], this.fig);
+                    var objet = d3.select(mpld3_element);
+                    console.log(objet);
+ 
+                    // mpld3_element might be null in case of Line2D instances
+                    // for we pass the id for both the line and the markers. Either
+                    // one might not exist on the D3 side
+                    if(mpld3_element){
+                        mpld3_elements.push(mpld3_element);}
+                }
+                obj.mpld3_elements = mpld3_elements;
+                obj.visible = this.props.start_visible[i];
+                legendItems.push(obj);
+                set_alphas(obj, false);
+
+            }
+
+            // determine the axes with which this legend is associated
+            var ax = this.props.ax
+            if(!ax){
+                ax = this.fig.axes[0];
+            } else{
+                ax = mpld3.get_element(ax, this.fig);
+            }
+
+            // add a legend group to the canvas of the figure
+            var legend = this.fig.canvas.append("svg:g")
+                                .attr("class", "legend");
+
+            // add the rectangles
+            legend.selectAll("rect")
+                    .data(legendItems)
+                    .enter().append("rect")
+                    .attr("height", 10)
+                    .attr("width", 25)
+                    .attr("x", ax.width + ax.position[0] + 25)
+                    .attr("y",function(d,i) {
+                            return ax.position[1] + i * 25 + 10;})
+                    .attr("stroke", get_color)
+                    .attr("class", "legend-box")
+                    .style("fill", function(d, i) {
+                            return d.visible ? get_color(d) : "white";})
+                    .on("click", click).on('mouseover', over).on('mouseout', out);
+
+            // add the labels
+            legend.selectAll("text")
+                .data(legendItems)
+                .enter().append("text")
+                .attr("x", function (d) {
+                            return ax.width + ax.position[0] + 25 + 40;})
+                .attr("y", function(d,i) {
+                            return ax.position[1] + i * 25 + 10 + 10 - 1;})
+                .text(function(d) { return d.label });
+
+
+            // specify the action on click
+            function click(d,i){
+                d.visible = !d.visible;
+                d3.select(this)
+                .style("fill",function(d, i) {
+                    return d.visible ? get_color(d) : "white";
+                })
+                set_alphas(d, false);
+                var texte = text[i];
+                console.log(d);
+                var css = "mpld3-texte_" + d.label;
+                console.log(css);
+
+                for(var j=0; j<texte.length; j++){
+
+                    console.log(d.mpld3_elements[0]);
+                    console.log(texte[j]);
+                    var elem = d.mpld3_elements[0].pathsobj._groups[0];
+                    var coord = elem[j].getBoundingClientRect();
+
+                    if (d.visible == true) {
+                    var tooltip = (d3.select("body")).append("div")
+                        .attr("class", css )
+                        .style("position", "absolute")
+                        .style("z-index", "10")
+                        .style("visibility", "visible")
+                        .style("top", coord.top + "px")
+                        .style("left", coord.left + "px");
+
+                    tooltip.html(texte[j])
+                        .style("visibility", "visible");
+
+                    } else {
+                    
+                    var bod = d3.select("body")._groups[0];
+                    console.log(bod[0]);
+                    for (var i=0; i < bod[0].childNodes.length; i++) {
+                        if (bod[0].childNodes[i].className == css) {
+                            (bod[0].childNodes[i]).parentNode.removeChild(bod[0].childNodes[i]);
+                            }
+                        }
+
+                    }
+                    
+                }
+            };
+
+            // specify the action on legend overlay 
+            function over(d,i){
+                set_alphas(d, true);
+            };
+
+            // specify the action on legend overlay 
+            function out(d,i){
+                set_alphas(d, false);
+            };
+
+            // helper function for setting alphas
+            function set_alphas(d, is_over){
+                for(var i=0; i<d.mpld3_elements.length; i++){
+                    var type = d.mpld3_elements[i].constructor.name;
+
+                    if(type =="mpld3_Line"){
+                        var current_alpha = d.mpld3_elements[i].props.alpha;
+                        var current_alpha_unsel = current_alpha * alpha_unsel;
+                        var current_alpha_over = current_alpha * alpha_over;
+                        d3.select(d.mpld3_elements[i].path[0][0])
+                            .style("stroke-opacity", is_over ? current_alpha_over :
+                                                    (d.visible ? current_alpha : current_alpha_unsel))
+                            .style("stroke-width", is_over ? 
+                                    alpha_over * d.mpld3_elements[i].props.edgewidth : d.mpld3_elements[i].props.edgewidth);
+                    } else if((type=="mpld3_PathCollection")||
+                            (type=="mpld3_Markers")){
+                        var current_alpha = d.mpld3_elements[i].props.alphas[0];
+                        var current_alpha_unsel = current_alpha * alpha_unsel;
+                        var current_alpha_over = current_alpha * alpha_over;
+                        d3.selectAll(d.mpld3_elements[i].pathsobj[0])
+                            .style("stroke-opacity", is_over ? current_alpha_over :
+                                                    (d.visible ? current_alpha : current_alpha_unsel))
+                            .style("fill-opacity", is_over ? current_alpha_over :
+                                                    (d.visible ? current_alpha : current_alpha_unsel));
+                    
+                    } else{
+                        console.log(type + " not yet supported");
+                    }
+                }
+            };
+
+
+
+            // helper function for determining the color of the rectangles
+            function get_color(d){
+                var type = d.mpld3_elements[0].constructor.name;
+                var color = "black";
+                if(type =="mpld3_Line"){
+                    color = d.mpld3_elements[0].props.edgecolor;
+                } else if((type=="mpld3_PathCollection")||
+                        (type=="mpld3_Markers")){
+                    color = d.mpld3_elements[0].props.facecolors[0];
+                } else{
+                    console.log(type + " not yet supported");
+                }
+                return color;
+            };
+        };
+        """
+
+        css_ = """
+        .legend-box {
+        cursor: pointer;
+        }
+
+        .legend > text {
+        font-family:Arial, Helvetica, sans-serif;font-size:18px;
+        }
+
+        body > div {
+        font-family:Arial, Helvetica, sans-serif;
+        font-size:16px;
+        color:rgba(0,0,0,0.7)
+        background-color: rgba(255,255,255,0.8);
+        }
+        """
+
+        def __init__(self, plot_elements,texte, labels, ax=None,
+                    alpha_unsel=0.2, alpha_over=1., start_visible=True):
+
+            self.ax = ax
+
+            if ax:
+                ax = get_id(ax)
+
+            # start_visible could be a list
+            if isinstance(start_visible, bool):
+                start_visible = [start_visible] * len(labels)
+            elif not len(start_visible) == len(labels):
+                raise ValueError("{} out of {} visible params has been set"
+                                .format(len(start_visible), len(labels)))     
+
+            mpld3_element_ids = self._determine_mpld3ids(plot_elements)
+            self.mpld3_element_ids = mpld3_element_ids
+            self.dict_ = {"type": "interactive_legend",
+                        "element_ids": mpld3_element_ids,
+                        "text": texte,
+                        "labels": labels,
+                        "ax": ax,
+                        "alpha_unsel": alpha_unsel,
+                        "alpha_over": alpha_over,
+                        "start_visible": start_visible}
+
+        def _determine_mpld3ids(self, plot_elements):
+            """
+            Helper function to get the mpld3_id for each
+                of the specified elements.
+            """
+            mpld3_element_ids = []
+
+            # There are two things being done here. First,
+            # we make sure that we have a list of lists, where
+            # each inner list is associated with a single legend
+            # item. Second, in case of Line2D object we pass
+            # the id for both the marker and the line.
+            # on the javascript side we filter out the nulls in
+            # case either the line or the marker has no equivalent
+            # D3 representation.
+            for entry in plot_elements:
+                ids = []
+                if isinstance(entry, collections.Iterable):
+                    for element in entry:
+                        mpld3_id = get_id(element)
+                        ids.append(mpld3_id)
+                        if isinstance(element, mpl.lines.Line2D):
+                            mpld3_id = get_id(element, 'pts')
+                            ids.append(mpld3_id)
+                else:
+                    ids.append(get_id(entry))
+                    if isinstance(entry, mpl.lines.Line2D):
+                        mpld3_id = get_id(entry, 'pts')
+                        ids.append(mpld3_id)
+                mpld3_element_ids.append(ids)
+
+            return mpld3_element_ids
+
     
+    class PointHTMLTooltipC(mpld3.plugins.PluginBase):
+    
+        JAVASCRIPT = """
+        mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+        HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+        HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+        HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+        HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                    hoffset:0,
+                                                    voffset:10};
+        function HtmlTooltipPlugin(fig, props){
+            mpld3.Plugin.call(this, fig, props);
+        };
+
+        HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var tooltip = d3.select("body").append("div")
+                        .attr("class", "mpld3-tooltip")
+                        .style("position", "absolute")
+                        .style("z-index", "10")
+                        .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                                tooltip.html(labels[i])
+                                        .style("visibility", "visible");})
+            .on("mousemove", function(d, i){
+                    tooltip
+                        .style("top", d3.event.pageY + this.props.voffset + "px")
+                        .style("left",d3.event.pageX + this.props.hoffset + "px");
+                    }.bind(this))
+            .on("mouseout",  function(d, i){
+                            tooltip.style("visibility", "hidden");});
+        };
+        """
+
+        def __init__(self, points, labels=None,
+                    hoffset=0, voffset=10, css=None):
+            self.points = points
+            self.labels = labels
+            self.voffset = voffset
+            self.hoffset = hoffset
+            self.css_ = css or ""
+            if isinstance(points, mpl.lines.Line2D):
+                suffix = "pts"
+            else:
+                suffix = None
+            self.dict_ = {"type": "htmltooltip",
+                        "id": get_id(points, suffix),
+                        "labels": labels,
+                        "hoffset": hoffset,
+                        "voffset": voffset}
+
     class TopToolbar(mpld3.plugins.PluginBase):
+
+        #Modifié pour inclure la barre d'outils en haut à gauche plutôt qu'en bas à droite
 
         JAVASCRIPT = """
         mpld3.register_plugin("toptoolbar", TopToolbar);
@@ -825,22 +1198,16 @@ def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,f
 
         def __init__(self):
             self.dict_ = {"type": "toptoolbar"}
-    
-
-    df = pd.DataFrame(dict(x=xs, y=ys, label=labels_docs_class, titres=noms_docs)) 
-
-    groupes = df.groupby('label')
+        
 
     css = """
-
-
     body > div > div {
         width: 100%;
         height: 100vh;
     }
 
     text.mpld3-text, div.mpld3-tooltip {
-    font-family:Arial, Helvetica, sans-serif;font-size:20px;
+    font-family:Arial, Helvetica, sans-serif;font-size:18px;
     }
 
     g.mpld3-xaxis, g.mpld3-yaxis {
@@ -863,57 +1230,61 @@ def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,f
         height: auto;}
     """
 
+    df = pd.DataFrame(dict(x=xs, y=ys, label=labels_docs_class, titres=noms_docs))
+    df.sort_values(by=['label'])
+
+    groupes = df.groupby('label')
+
     fig, ax = plt.subplots(figsize=(17,9))
     ax.margins(0.01)
+
 
     elem_points = []
     titres_tot = []
     titres_clust = []
-    titres_trsp = []
 
     for nom, groupe in groupes:
 
-        points = ax.plot(groupe.x, groupe.y, marker='o', linestyle='', ms=22, 
-                label=noms_clusters[nom], color=couleurs_clusters[nom], mec='none')
+        titres = []
+        pts = []
 
-        ax.set_aspect('auto')
+        for i in range(len(groupe)):
+
+            titres.append(groupe.iat[i,3])
+        
+        points = ax.scatter(groupe.x, groupe.y, marker='o', s=150,label=noms_clusters[nom], color=couleurs_clusters[nom])
 
         titres_clust.append(noms_clusters[nom])
 
-        titres = []
-
-        j=0
-        for i in groupe.titres:
-
-            #annot = ax.text((groupe.x).item(j),(groupe.y).item(j),i,label=noms_clusters[nom],alpha=0.0,size=20)
-            titres.append(i)
-            j+=1
-
-        #titres_trsp.append(annot)
-
-        elem_points.append(points)
-
         titres_tot.append(titres)
 
-    for i in range(len(groupes)):
-    
-        affichage_noms= mpld3.plugins.PointHTMLTooltip(elem_points[i][0],titres_tot[i],voffset=1, hoffset=1, css=css)
+        elem_points.append([points])
 
-        ilegend = mpld3.plugins.InteractiveLegendPlugin(elem_points,titres_clust,alpha_unsel=0.2, alpha_over=1.5)
 
-        mpld3.plugins.connect(fig, affichage_noms, ilegend,TopToolbar())
+    ## POINTS TRANSPARENTS POUR L'AFFICHAGE INDIVIDUEL DES TITRES
+    po = ax.plot(df.x, df.y, marker='o', linestyle='', ms=22, alpha = 0.0, mec='none')
 
-        ax.axes.get_xaxis().set_ticks([])
-        ax.axes.get_yaxis().set_ticks([])
-        ax.axes.get_xaxis().set_visible(False)
-        ax.axes.get_yaxis().set_visible(False)
+    tot = []
 
-    plt.subplots_adjust(right=0.7)
+    for i in range(len(df)):
 
+        tot.append(df.iat[i,3])
+
+    ##
+
+    affichage_noms= PointHTMLTooltipC(po[0],tot,voffset=1, hoffset=1, css=css)
+
+    ilegend = InteractiveLegendPluginTxt(elem_points,titres_tot,titres_clust,alpha_unsel=0.0, alpha_over=1.2,start_visible=False)
+
+    mpld3.plugins.connect(fig, affichage_noms,ilegend, TopToolbar())
+
+    plt.subplots_adjust(right=0.72)
 
     cd = 'GRAPH'
     t = str(datetime.datetime.now()).replace(':','_')
-    nm = os.path.join(cd, (t[:-7] + '.html'))
+    nm = os.path.join(cd, (nom_perso + ' ' + t[:-7] + '.html'))
+
+    ax.set_title((nom_perso +  ' - ' + t[:-16]), size=20, y=0, x = 1.2)
 
     mpld3.save_html(fig,nm)
 
@@ -1191,9 +1562,19 @@ clusters.pack(fill=X, expand = 'yes', pady=20)
 n_clusters = Spinbox(clusters, from_=3, to=50, bg= "#e6e6e6",fg='#232323')
 n_clusters.pack(pady=10)
 
-#data d'entraînement
+#nom personnalisé
 
-dir_src= LabelFrame(frame_train, borderwidth=0, text='''Dossier contenant les fichiers d'entraînement''', relief = SUNKEN, bg = '#e6e6e6')
+nm = LabelFrame(frame_train, borderwidth=0, text='Nom personnalisé', relief = SUNKEN, bg = '#e6e6e6')
+nm.config(fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
+nm.pack(fill=X, expand = 'yes', pady=20)
+
+nm_entry = Entry(nm, bg= "#e6e6e6",fg='#232323')
+nm_entry.insert(30,'Classification')
+nm_entry.pack(fill=X, expand = 'yes', pady=10)
+
+#data d'entraînement (désactivé)
+'''
+dir_src= LabelFrame(frame_train, borderwidth=0, text="Dossier contenant les fichiers d'entraînement", relief = SUNKEN, bg = '#e6e6e6')
 dir_src.config(fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
 dir_src.pack(fill=X, expand = 'yes', pady=20)
 
@@ -1202,11 +1583,14 @@ btn_src.config(fg='#232323')
 btn_src.pack(pady=10)
 
 r_src = Label(dir_src, text = "PDF", bg = '#e6e6e6')
-r_src.pack(fill=X, pady=10)
+'''
+r_src =  None
+#r_src.pack(fill=X, pady=10)
+
 
 #démarrer 
 
-btn_start = Button(bench_et_start, text="Lancer la classification",height=3, bg = '#00C800',fg = '#E6E6E6', command=(lambda: start(frame_output, bench_txt, r_src, r_test, n_clusters, entrain=entrain, mdl = r_mdl, cl=cl_output, gpu_bool = gpu, pdf_bool=pdf)))
+btn_start = Button(bench_et_start, text="Lancer la classification",height=3, bg = '#00C800',fg = '#E6E6E6', command=(lambda: start(frame_output, bench_txt, r_src, r_test, n_clusters, entrain=entrain, mdl = r_mdl, cl=cl_output, gpu_bool = gpu, pdf_bool=pdf,nm = nm_entry)))
 btn_start.config(highlightthickness = 1, highlightbackground='#009100', highlightcolor='#009100')
 btn_start.pack(pady= 20, fill=X)
 
