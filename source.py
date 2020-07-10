@@ -693,14 +693,15 @@ def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool,pdf_bool,nm):
 
     if train == False:
 
-        n_cl = joblib.load(dir_mdl+'/nb_clust.sav')
+        n_cl = joblib.load(dir_mdl+'/nb_clust.sav') #Chargement du nombre de clusters du modèle préentraîné
 
-        result = tester_texte(dir_src,dir_test,n_cl,entrainer=False,dir_model=dir_mdl, gpu = gpu_bool,pdf = pdf_bool)
+        result = tester_texte(dir_src,dir_test,n_cl,entrainer=False,dir_model=dir_mdl, gpu = gpu_bool,pdf = pdf_bool) #Prédiction sur le corpus de textes à classifier
 
-        result_clusters = clusters_en_features(result[2],n_cl,result[3],result[4])
+        result_clusters = clusters_en_features(result[2],n_cl,result[3],result[4]) #Extraction des 4 premières features par cluster
 
-        result_bench = str(result[1])
-        bench["text"] = result_bench
+        bench["text"] = str(result[1]) #Impression du temps d'exécution
+
+        #Impression des résultats des clusters selon le numéro du cluster
 
         for key in result_clusters:
 
@@ -710,15 +711,17 @@ def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool,pdf_bool,nm):
 
         for resultat in result[0]:
 
-            nom_indiv = os.path.split(str(resultat[0]))
+            nom_indiv = os.path.split(str(resultat[0])) #Récupération du nom des documents
 
             result_txt = nom_indiv[-1] + ' affecté au cluster N° '+ str(resultat[1])
 
-            frame.insert(END,result_txt)
+            frame.insert(END,result_txt) #Insertion des résultats dans l'interface
 
-            liste_index.append(resultat[1])
+            liste_index.append(resultat[1]) #Récupération du numéro du cluster pour chaque document
 
-        graph = produire_graph_2d(result[5],result_clusters,liste_index,result[7],frame,pdf_bool,nom_perso)
+        # Génération du graph HTML
+
+        graph = produire_graph_2d(result[5],result_clusters,liste_index,result[7],pdf_bool,nom_perso)
 
         
         
@@ -731,8 +734,7 @@ def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool,pdf_bool,nm):
 
         result_clusters = clusters_en_features(result[2],n_cl,result[3],result[4])
 
-        result_bench = str(result[1])
-        bench["text"] = result_bench
+        bench["text"] = str(result[1])
 
         for key in result_clusters:
 
@@ -750,7 +752,7 @@ def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool,pdf_bool,nm):
 
             liste_index.append(resultat[1])
 
-        graph = produire_graph_2d(result[5],result_clusters,liste_index,result[7],frame,pdf_bool,nom_perso)
+        graph = produire_graph_2d(result[5],result_clusters,liste_index,result[7],pdf_bool,nom_perso)
 
     msg = 'Graph exporté sous :' + graph
 
@@ -788,7 +790,7 @@ def clusters_en_features(mdl,n,termes,vocab):
     return clusters_dict
 
 
-def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,frame_log,pdf,nom):
+def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,pdf,nom):
 
     nom_perso = nom
 
@@ -1282,15 +1284,6 @@ def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,f
     ax.set_title((nom_perso +  ' - ' + t[:-16]), size=20, y=0, x = 1.2)
 
     mpld3.save_html(fig,nm)
-
-    '''
-    path_gexf = generer_gexf(df,couleurs_clusters,noms_clusters)
-
-    msg = 'fichier GEXF enregistré sous : ' + path_gexf + ' avec succès'
-
-    frame_log.insert(END,' ')
-    frame_log.insert(END,msg)
-    '''
 
     return nm
 
