@@ -163,7 +163,7 @@ def nettoyage_phrases(txt):
     return texte_n
 '''
 
-def token_pour_tfidf(txt):
+def tokenisation(txt):
 
     stop_words = []
 
@@ -172,7 +172,6 @@ def token_pour_tfidf(txt):
     for ligne in f.readlines():
 
         stop_words.append(ligne[:-1])
-    
 
     tk = [mot for mot in txt.split() if (len(mot)>3) and (mot not in stop_words)]
 
@@ -180,26 +179,17 @@ def token_pour_tfidf(txt):
     n_tk = [token for token in tk if (token not in blank)]
 
     stemmer=FrenchStemmer()
-    n_tk = [stemmer.stem(token) for token in n_tk]
+    n_tk_racin = [stemmer.stem(token) for token in n_tk]
 
-    return n_tk
+    n_tk_racin_regroup = ""
 
-def token_sans_racin_pour_tfidf(txt):
+    for n in n_tk_racin:
 
-    stop_words = []
+        a = ' ' + n
+        n_tk_racin_regroup += a
 
-    f = open(('stopwordsfr.txt'),"r")
 
-    for ligne in f.readlines():
-
-        stop_words.append(ligne[:-1])
-
-    tk = [mot for mot in txt.split() if (len(mot)>3) and (mot not in stop_words)]
-
-    blank = ""
-    n_tk = [token for token in tk if (token not in blank)]
-
-    return n_tk
+    return n_tk,n_tk_racin,n_tk_racin_regroup
 
 '''
 def racin_pour_tfidf(lst):
@@ -494,15 +484,21 @@ def entrainer_depuis_corpus(dir_src,n,gpu,pdf):
 
     ss_racin = []
     racin = []
+    liste_tokens = []
 
     for txt in sac2:
-        ss_racin.extend(token_sans_racin_pour_tfidf(txt))
-        racin.extend(token_pour_tfidf(txt))
+
+        token = tokenisation(txt)
+        liste_tokens.append(token[2])
+        ss_racin.extend(token[0])
+        racin.extend(token[1])
+
 
     vocab = pd.DataFrame({'words': ss_racin}, index = racin)
 
-    tfconv = TfidfVectorizer(input = 'content',max_df=0.8, min_df=0.2,max_features = 9000000, token_pattern=None,analyzer='word',preprocessor=None,lowercase=False, tokenizer=token_pour_tfidf).fit(sac2)
-    corpus_vect = tfconv.transform(sac2)
+    vectoriseur = TfidfVectorizer(input = 'content',max_df=0.8, min_df=0.2,max_features = 9000000,token_pattern=r'\S+',preprocessor=None,lowercase=False, tokenizer=None)
+
+    corpus_vect = vectoriseur.fit_transform(liste_tokens)
 
     if gpu == False:
 
@@ -524,10 +520,10 @@ def entrainer_depuis_corpus(dir_src,n,gpu,pdf):
     path= os.path.join(cd,t[:-7]+(suffixe))
     os.mkdir(path)
 
-    termes = tfconv.get_feature_names()
+    termes = vectoriseur.get_feature_names()
     
     joblib.dump(modele_custom,(path + '/model.sav'))
-    joblib.dump(tfconv,(path + '/vect.sav'))
+    joblib.dump(vectoriseur,(path + '/vect.sav'))
     joblib.dump(n,(path + '/nb_clust.sav'))
     joblib.dump(vocab,(path + '/vocab.sav'))
     joblib.dump(termes,(path + '/termes.sav'))
@@ -537,7 +533,7 @@ def entrainer_depuis_corpus(dir_src,n,gpu,pdf):
         nm.write(x+"\n")
     nm.close()
 
-    return modele_custom,tfconv,vocab,noms
+    return modele_custom,vectoriseur,vocab,noms
 
 
 def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu,pdf):
@@ -693,7 +689,6 @@ def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool,pdf_bool,nm):
     n_cl = int()
     dir_src = str()
     nom_perso = nm.get()
-
     train = entrain.get()
 
     if train == False:
