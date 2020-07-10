@@ -4,9 +4,7 @@
 
 NLPvs est un outil de classification de documents contenants du texte (actuellement prévu pour des fichiers aux formats PDF et HTML) en combinant une analyse de proximité sémantique grâce à l'établissement d'une matrice Tf-idf, ainsi que l'algorithme de clustering Kmeans, outil de Machine Learning non-supervisé.
 <img src="old_resources/schema.png"/>
-
-# Current Status 
-
+ 
 <h3>Fonctionnalités</h3>
 
 <ul>
@@ -26,7 +24,7 @@ NLPvs est un outil de classification de documents contenants du texte (actuellem
 # Installation
 
 <ul>
-  <li>NLPvs a été développé en Python (3.7.6, but should work on latest available version) au sein d'un environnement Anaconda, recommandé pour l'installation des modules requis : <a href=https://www.anaconda.com/>Anaconda</a></li>
+  <li>NLPvs a été développé en Python (3.7.6) au sein d'un environnement Anaconda, recommandé pour l'installation des modules requis : <a href=https://www.anaconda.com/>Anaconda</a></li>
   <li>La liste des modules requis et leurs commandes d'installation respectives sont spécifiées dans le fichier <a href="requirements.md">requirements</a></li>
 </ul>
 

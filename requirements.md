@@ -1,6 +1,6 @@
 # Modules requis
 
-<h3>Environnement conseillé : Conda</h3>
+<h3>Environnement conseillé : Anaconda</h3>
 
 <ul style="list-style: none;">
     <li>PDFMiner</li>
