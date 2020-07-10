@@ -17,7 +17,7 @@ NLPvs est un outil de classification de documents contenants du texte (actuellem
 
 <img src="old_resources/GUIv1.png"/>
 
-<h3>Graph example</h3>
+<h3>Exemple de graphique en sortie</h3>
 
 <img src="old_resources/graph2.png"/>
 
