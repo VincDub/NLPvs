@@ -9,9 +9,6 @@
     <li>NLTK</li>
     <code>conda install NLTK</code>
     <li></li>
-    <li>French Leff Lemmatizer</li>
-    <code>pip install git+https://github.com/ClaudeCoulombe/FrenchLefffLemmatizer.git</code>
-    <li></li>
     <li>Pandas</li>
     <code>conda install pandas</code>
     <li></li>
@@ -26,9 +23,6 @@
     <li></li>
     <li>Matplotlib</li>
     <code>conda install matplotlib</code>      
-    <li></li>
-    <li>Networkx</li>
-    <code>conda install networkx</code>      
     <li></li>
     <li>Pillow</li>
     <code>conda install -c anaconda pillow</code>      

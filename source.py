@@ -1,84 +1,66 @@
-import pdfminer
-from pdfminer import high_level
-
-import networkx as nx
-
-import pandas as pd
-
-import unicodedata
-import re
-import string
-import time
-import joblib
-import sys
-import os
-import random
-import webbrowser
-from tkinter import *
-from tkinter import filedialog
-import datetime
-import tkinter.font as tkFont
-from PIL import Image, ImageTk
-import numpy as np
-from bs4 import BeautifulSoup
+## bibliothèques système
 import codecs
 import collections
+import datetime
+import os
+import random
+import re
 import shutil
+import string
+import sys
+import time
+import tkinter.font as tkFont
+import unicodedata
+import webbrowser
 
-import nltk
-from nltk import tokenize
-from nltk.corpus import stopwords 
-from nltk.tokenize import word_tokenize
-from nltk.stem.snowball import FrenchStemmer
-from french_lefff_lemmatizer.french_lefff_lemmatizer import FrenchLefffLemmatizer
-from nltk import FreqDist
+## création d'interface graphique avec des widgets
+from tkinter import filedialog
+import tkinter as Tk
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-import sklearn.cluster as skcl
-from sklearn.manifold import MDS
-from sklearn.metrics.pairwise import cosine_similarity
+## gestion d'images pour le logo sur l'interface graphique
+from PIL import Image, ImageTk
 
-import matplotlib.pyplot as plt
+## génération des graphiques
 import matplotlib as mpl
+import matplotlib.pyplot as plt
 import mpld3
 from mpld3.utils import get_id
 
-#import cuml.cluster as cucl
+## Gestion et manipulation des matrices
+import numpy as np
 
+## Création de tables de données
+import pandas as pd
+
+## parsing des fichiers HTML
+from bs4 import BeautifulSoup
+
+## fonction de racinisation pour le français
+import nltk
+from nltk.stem.snowball import FrenchStemmer
+
+## parsing des ficchiers PDF
+from pdfminer import high_level
+
+## sauvegarde et chargement des modèles de classification
+import joblib
+
+## algorithmes ML pour la vectorisation, la clusterisation et la réduction de dimensions
+import sklearn.cluster as skcl
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.manifold import MDS
+from sklearn.metrics.pairwise import cosine_similarity
+
+## algorithmes ML avec accélération CUDA
+## import uniquement si cuml est installé sur un système compatible
 try:
     import cuml.cluster as cucl
 except ImportError:
     cucl = None
-
-#### POUR JS
-
-'''
-def html_id_ok(objid, html5=False):
-    """Check whether objid is valid as an HTML id attribute.
-    If html5 == True, then use the more liberal html5 rules.
-    """
-    if html5:
-        return not re.search('\s', objid)
-    else:
-        return bool(re.match("^[a-zA-Z][a-zA-Z0-9\-\.\:\_]*$", objid))
+    print("impossible d'importer cuML : accélération GPU désactivée par défaut")
 
 
-def get_id(obj, suffix="", prefix="el", warn_on_invalid=True):
-    """Get a unique id for the object"""
-    if not suffix:
-        suffix = ""
-    if not prefix:
-        prefix = ""
-
-    objid = prefix + str(os.getpid()) + str(id(obj)) + suffix
-
-    if warn_on_invalid and not html_id_ok(objid):
-        warnings.warn('"{0}" is not a valid html ID. This may cause problems')
-
-    return objid
-'''
-
-### GENERATION COULEURS ALEATOIRES LES PLUS DISTINCTES POSSIBLE
+## Génération de couleurs aléatoires les plus distinctes possibles entre elles
 
 def get_random_color(pastel_factor = 0.5):
     return [(x+pastel_factor)/(1.0+pastel_factor) for x in [random.uniform(0,1.0) for i in [1,2,3]]]
@@ -99,6 +81,7 @@ def generate_new_color(existing_colors,pastel_factor = 0.5):
             best_color = color
     return best_color
 
+## Récupération des chemins des fichiers à classer dans le répertoire défini
 
 def fichiers_cibles(chm):
 
@@ -113,9 +96,13 @@ def fichiers_cibles(chm):
                 noms_fichiers.append(chemin)          
         return noms_fichiers
 
-def nettoyage_sans_phrases(txt):
 
-    txt_ss = list()
+## Nettoyage des textes extraits des fichiers à classer
+## Contient différentes opérations sur les chaînes de caractères
+
+def nettoyage(txt):
+
+    texte_clean = list()
 
     for texte in txt:
         texte = "".join(texte.splitlines())
@@ -125,43 +112,11 @@ def nettoyage_sans_phrases(txt):
         texte = texte.translate(rm_ponctuation)
         texte = "".join([i for i in texte if not i.isdigit()]) ## SUPPRESSION DES CHIFFRES
         texte = re.sub(u'\u2019',u"\u0027", texte)
-        txt_ss.append(texte)
+        texte_clean.append(texte)
 
-    return txt_ss
+    return texte_clean
 
-
-'''
-def phrases(txt):
-
-    phrases = list()
-
-    for texte in txt:
-        phrases.append(tokenize.sent_tokenize(texte))
-    
-    return phrases
-
-def nettoyage_phrases_aux(txt):
-
-    phrases_n = list()
-
-    for phrase in txt:
-            phrase = phrase.lower()
-            rm_ponctuation = str.maketrans('','', string.punctuation)
-            phrase = phrase.translate(rm_ponctuation)
-            phrases_n.append(phrase)
-    
-    return phrases_n
-
-def nettoyage_phrases(txt):
-
-    texte_n = list()
-
-    for texte in txt:
-        texte = nettoyage_phrases_aux(texte)
-        texte_n.append(texte)
-
-    return texte_n
-'''
+## Tokenisation du texte nettoyé de chaque fichier à classer
 
 def tokenisation(txt):
 
@@ -176,154 +131,53 @@ def tokenisation(txt):
     tk = [mot for mot in txt.split() if (len(mot)>3) and (mot not in stop_words)]
 
     blank = ""
-    n_tk = [token for token in tk if (token not in blank)]
+    texte_tk = [token for token in tk if (token not in blank)]
 
     stemmer=FrenchStemmer()
-    n_tk_racin = [stemmer.stem(token) for token in n_tk]
+    texte_tk_racin = [stemmer.stem(token) for token in texte_tk]
 
-    n_tk_racin_regroup = ""
+    texte_tk_racin_regroup = ""
 
-    for n in n_tk_racin:
+    for n in texte_tk_racin:
 
         a = ' ' + n
-        n_tk_racin_regroup += a
+        texte_tk_racin_regroup += a
+
+    return texte_tk,texte_tk_racin,texte_tk_racin_regroup
 
 
-    return n_tk,n_tk_racin,n_tk_racin_regroup
+## Extraction du texte sous forme d'une chaîne de caractère par document à classer
+## pour les fichiers PDF
 
-'''
-def racin_pour_tfidf(lst):
+def extraction_texte_pdf(chemin):
 
-    stemmer=FrenchStemmer()
-    n_tk = [stemmer.stem(token) for token in lst]
-
-    return n_tk
-
-def token_aux(txt):
-
-    mots_phrases = list()
-
-    for phrase in txt:
-
-        stop_words = set(stopwords.words("french"))
-
-
-        tk = [mot for mot in phrase.split() if (len(mot)>2) and (mot not in stop_words)]
-
-        blank = ""
-        n_tk = [token for token in tk if (token not in blank)]
-
-        mots_phrases.append(n_tk)
-        
-
-    return mots_phrases
-
-def token(txt):
-
-    texte_n2 = list()
-
-    for texte in txt:
-        texte = token_aux(texte)
-        texte_n2.append(texte)
-
-    return texte_n2
-
-def racin_aux(txt):
-
-    mots_phrases = list()
-
-    for phrase in txt:
-
-        tk = [mot for mot in phrase]
-
-        stemmer=FrenchStemmer()
-        tk = [stemmer.stem(token) for token in tk]
-        blank = ""
-        n_tk = [token for token in tk if (token not in blank)]
-
-        mots_phrases.append(n_tk)
-        
-
-    return mots_phrases
-
-def racin(txt):
-
-    texte_n2 = list()
-
-    for texte in txt:
-        texte = racin_aux(texte)
-        texte_n2.append(texte)
-
-    return texte_n2
-
-def token_et_racin(txt):
-
-    texte = racin(token(txt))
-
-    return texte
-
-def nettoyage_2_aux(txt):
-
-    mots_phrases = list()
-
-    for phrase in txt:
-        #phrase = re.sub('[^a-z_]', ' ', phrase)
-        stop_words = set(stopwords.words("french"))
-
-        #tk = word_tokenize(phrase)
-
-        tk = [mot for mot in phrase.split() if (len(mot)>2) and (mot not in stop_words)]
-        #phrase = [word for word in tk if word not in stop_words]
-
-        stemmer=FrenchStemmer()
-        #lm = FrenchLefffLemmatizer()
-        tk = [stemmer.stem(token) for token in tk]
-        #tk = [lm.lemmatize(token) for token in tk]
-        blank = ""
-        n_tk = [token for token in tk if (token not in blank)]
-
-        mots_phrases.append(n_tk)
-        
-
-    return mots_phrases
-
-def nettoyage_2(txt):
-
-    texte_n2 = list()
-
-    for texte in txt:
-        texte = nettoyage_2_aux(texte)
-        texte_n2.append(texte)
-
-    return texte_n2
-'''
-
-def preprocess_pdf_masse(dir):
-
-    noms_fichiers = fichiers_cibles(dir)
-    noms_fichiers_o = list()
-    textes_fichiers = list()
+    noms_fichiers = fichiers_cibles(chemin)
+    noms_fichiers_sortie = []
+    textes_fichiers = []
     
-    for entry in noms_fichiers:
+    for nom in noms_fichiers:
 
         try:
-            textes_fichiers.append(pdfminer.high_level.extract_text(entry,"",None,0,True,'utf-8',None))
-            noms_fichiers_o.append(entry)
+            textes_fichiers.append(high_level.extract_text(nom,"",None,0,True,'utf-8',None))
+            noms_fichiers_sortie.append(nom)
 
         except TypeError:
             
-            print('la structure du fichier ' + entry + ' est invalide !')
+            print('la structure du fichier ' + nom + ' est invalide !')
 
-    fichiers_clean = nettoyage_sans_phrases(textes_fichiers)
+    fichiers_clean = nettoyage(textes_fichiers)
 
-    return noms_fichiers_o, fichiers_clean
+    return noms_fichiers_sortie, fichiers_clean
 
 
-def preprocess_html_masse(dir):
+## Extraction du texte sous forme d'une chaîne de caractère par document à classer
+## pour les fichiers HTML
 
-    noms_fichiers = fichiers_cibles(dir)
-    textes_fichiers = list()
-    noms_fichiers_o= list()
+def extraction_texte_html(chemin):
+
+    noms_fichiers = fichiers_cibles(chemin)
+    textes_fichiers = []
+    noms_fichiers_sortie= []
     
     for nom in noms_fichiers:
  
@@ -347,421 +201,234 @@ def preprocess_html_masse(dir):
 
         if len(texte_p) >= 100:
 
-            noms_fichiers_o.append(nom)
+            noms_fichiers_sortie.append(nom)
             textes_fichiers.append(texte_p) 
 
+    fichiers_clean = nettoyage(textes_fichiers)
 
-    fichiers_clean = nettoyage_sans_phrases(textes_fichiers)
-
-    return noms_fichiers_o, fichiers_clean
-
-'''
-    nbr_phrases = list()
-
-    for ensemble_phrases in phrases_fichiers:
-        nbr_phrases.append(len(ensemble_phrases))
-
-    #hapaxes = trouver_hapaxes(phrases_fichiers_tk)
-
-    pdf_dict = {'Titre' :noms_fichiers, 'Nombre de phrases' :nbr_phrases, 'Texte' :phrases_fichiers_tk}
-    pdf_df = pd.DataFrame(pdf_dict)
-
-    pdf_df.to_csv("CSV/output.csv", sep=',',index=False)
-
-    t_1 = time.time()
-
-    delta_t = "éxécuté en " + (str(t_1 - t_0))[:5] + " secondes"
-
-    return pdf_df, delta_t
-
-def sac_de_mots(txt):
-
-    sac_de_mots = list()
-
-    for texte in txt:
-
-        sac_de_mots.append(sac_de_mots_grp(texte))
-
-    return sac_de_mots
+    return noms_fichiers_sortie, fichiers_clean
 
 
-def sac_de_mots_grp(txt):
+## Classification d'un corpus de documents en créant et sauvegardant un nouveau modèle
 
-    txt_grp = ""
+def classifier_corpus_nouveau_modele(dir_class,nombre_clusters,gpu_bool,pdf_bool):
 
-    for phrase in txt:
-        for mot in phrase:
-            txt_grp += (mot +" ") 
+    if pdf_bool==True:
 
-    return txt_grp
-
-def vectoriser_vrac(dir_src):
-
-    preprocess = preprocess_pdf_masse(dir_src)
-
-    sac = sac_de_mots(preprocess[1])
-
-    tfconv = TfidfVectorizer(input = 'content',max_features = 9000000,ngram_range=(1,3),preprocessor=None,lowercase=False, tokenizer=None)
-    tfidf = tfconv.fit_transform(sac)
-
-    return tfconv
-
-'''
-
-def vectoriser_avec_noms(dir_src,vectoriz,pdf):
-
-    if pdf==True:
-
-        preprocess = preprocess_pdf_masse(dir_src)
+        preprocess = extraction_texte_pdf(dir_class)
     else:
-        preprocess = preprocess_html_masse(dir_src)
 
-    noms = preprocess[0]
-    textes_vec = list()
+        preprocess = extraction_texte_html(dir_class)
 
-    sac = preprocess[1]
+    liste_textes = preprocess[1]
+    noms_fichiers = preprocess[0]
 
-    matrice = vectoriz.fit_transform(sac)
-
-    textes_vec.append(matrice)
-
-    return noms, textes_vec, matrice
-
-
-def vectoriser_avec_noms_diff(dir_src,vectoriz,pdf):
-
-    if pdf==True:
-        preprocess = preprocess_pdf_masse(dir_src)
-    else:
-        preprocess = preprocess_html_masse(dir_src)
-
-    noms = preprocess[0]
-    textes_vec = list()
-
-    sac = preprocess[1]
-
-    matrice = vectoriz.transform(sac)
-
-    textes_vec.append(matrice)
-
-    return noms, textes_vec, matrice
-
-'''
-def sepa(txt):
-
-    brut = list()
-    for texte in txt:
-        for phrase in texte:
-            for mot in phrase:
-                brut.append(mot)
-    
-    return brut
-
-def j_phrases(txt):
-
-    liste_textes = list()
-
-    for texte in txt:
-        for phrase in texte:
-            for mot in phrase:
-                liste_mots= list()
-                liste_mots.extend(mot)
-        
-        liste_textes.append(liste_mots)
-
-    return liste_textes
-'''
-
-def entrainer_depuis_corpus(dir_src,n,gpu,pdf):
-
-    if pdf==True:
-        preprocess = preprocess_pdf_masse(dir_src)
-    else:
-        preprocess = preprocess_html_masse(dir_src)
-
-    sac2 = preprocess[1]
-    noms = preprocess[0]
-
-    ss_racin = []
+    sans_racin = []
     racin = []
     liste_tokens = []
 
-    for txt in sac2:
+    for txt in liste_textes:
 
         token = tokenisation(txt)
+
         liste_tokens.append(token[2])
-        ss_racin.extend(token[0])
+        sans_racin.extend(token[0])
         racin.extend(token[1])
 
 
-    vocab = pd.DataFrame({'words': ss_racin}, index = racin)
+    vocabulaire = pd.DataFrame({'words': sans_racin}, index = racin)
 
     vectoriseur = TfidfVectorizer(input = 'content',max_df=0.8, min_df=0.2,max_features = 9000000,token_pattern=r'\S+',preprocessor=None,lowercase=False, tokenizer=None)
 
-    corpus_vect = vectoriseur.fit_transform(liste_tokens)
+    matrice_corpus = vectoriseur.fit_transform(liste_tokens)
 
-    if gpu == False:
+    termes = vectoriseur.get_feature_names()
 
-        modele_custom = skcl.KMeans(n_clusters=n, init='k-means++').fit(corpus_vect)
+    if gpu_bool == False:
+
+        modele_clusterisation = skcl.KMeans(n_clusters=nombre_clusters, init='k-means++').fit(matrice_corpus)
         suffixe = "-CPU"
     
     elif cucl == None:
 
-        modele_custom = skcl.KMeans(n_clusters=n, init='k-means++').fit(corpus_vect)
+        modele_clusterisation = skcl.KMeans(n_clusters=nombre_clusters, init='k-means++').fit(matrice_corpus)
         suffixe = "-CPU"
 
     else:
 
-        modele_custom = cucl.KMeans(n_clusters=n, init='k-means++').fit(corpus_vect)
+        modele_clusterisation = cucl.KMeans(n_clusters=nombre_clusters, init='k-means++').fit(matrice_corpus)
         suffixe = "-CUDA_(GPU Nvidia Requis)"
 
-    cd = 'MODEL'
-    t = str(datetime.datetime.now()).replace(':','_')
-    path= os.path.join(cd,t[:-7]+(suffixe))
-    os.mkdir(path)
 
-    termes = vectoriseur.get_feature_names()
+    modele_clusterisation.predict(matrice_corpus)
     
-    joblib.dump(modele_custom,(path + '/model.sav'))
+    classification = modele_clusterisation.labels_.tolist()
+    
+    resultats_classification = dict()
+
+
+    i = 0
+    for cl in classification:
+
+        nom = (os.path.split(noms_fichiers[i]))[-1]
+        if pdf_bool == True:
+
+            nom_solo = nom[:-4]
+
+        else:
+
+            nom_solo = nom[:-5]
+
+        resultats_classification[nom_solo] = cl
+        i += 1
+
+    clusters = extraction_features(modele_clusterisation,nombre_clusters,termes,vocabulaire)
+
+
+    t = str(datetime.datetime.now()).replace(':','_')
+    path= os.path.join('MODEL',t[:-7]+(suffixe))
+    os.mkdir(path)
+    
+    joblib.dump(modele_clusterisation,(path + '/model.sav'))
     joblib.dump(vectoriseur,(path + '/vect.sav'))
-    joblib.dump(n,(path + '/nb_clust.sav'))
-    joblib.dump(vocab,(path + '/vocab.sav'))
+    joblib.dump(nombre_clusters,(path + '/nb_clust.sav'))
+    joblib.dump(vocabulaire,(path + '/vocab.sav'))
     joblib.dump(termes,(path + '/termes.sav'))
-    nm = open((path+"/noms.txt"),"w+")
 
-    for x in noms:
-        nm.write(x+"\n")
-    nm.close()
-
-    return modele_custom,vectoriseur,vocab,noms
+    return resultats_classification,clusters,matrice_corpus
 
 
-def tester_texte(dir_src,dir_test,n,entrainer,dir_model,gpu,pdf):
+## Classification d'un corpus de documents à partir d'un modèle existant
+
+def classifier_corpus_modele_existant(dir_class,dir_mdl,pdf_bool):
+
+
+    if pdf_bool==True:
+
+        preprocess = extraction_texte_pdf(dir_class)
+    else:
+
+        preprocess = extraction_texte_html(dir_class)
+
+    liste_textes = preprocess[1]
+    noms_fichiers = preprocess[0]
+
+    sans_racin = []
+    racin = []
+    liste_tokens = []
+
+    for txt in liste_textes:
+
+        token = tokenisation(txt)
+
+        liste_tokens.append(token[2])
+        sans_racin.extend(token[0])
+        racin.extend(token[1])
+    
+    vocabulaire = joblib.load(dir_mdl + '/vocab.sav')
+    vectoriseur = joblib.load(dir_mdl+'/vect.sav')
+    termes = joblib.load(dir_mdl+'/termes.sav')
+    nombre_clusters = joblib.load(dir_mdl+'/nb_clust.sav')
+    modele_clusterisation = joblib.load(dir_mdl+'/model.sav')
+
+    matrice_corpus = vectoriseur.fit_transform(liste_tokens)
+
+    modele_clusterisation.predict(matrice_corpus)
+
+    classification = modele_clusterisation.labels_.tolist()
+
+    resultats_classification = dict()
+
+    i = 0
+    for cl in classification:
+
+        nom = (os.path.split(noms_fichiers[i]))[-1]
+        if pdf_bool == True:
+
+            nom_solo = nom[:-4]
+
+        else:
+
+            nom_solo = nom[:-5]
+
+        resultats_classification[nom_solo] = cl
+        i += 1
+
+    clusters = extraction_features(modele_clusterisation,nombre_clusters,termes,vocabulaire)
+
+    return resultats_classification,clusters,matrice_corpus
+
+## Fonction principale
+
+def main(frame_resultats,frame_bench,frame_clusters,dir_class,dir_mdl,nombre_clusters,nom_perso,entrainement_bool,gpu_bool,pdf_bool):
 
     t_0 = time.time()
 
-    if entrainer == False :
+    gpu_bool = gpu_bool.get()
+    pdf_bool = pdf_bool.get()
+    dir_class = dir_class.cget("text")
+    dir_mdl = dir_mdl.cget("text")
+    nombre_clusters = int(nombre_clusters.get())
+    nom_perso = nom_perso.get()
+    entrainement_bool = entrainement_bool.get()
 
-        modele = joblib.load(dir_model+'/model.sav')
-        vectoriseur = joblib.load(dir_model+'/vect.sav')
-        termes = joblib.load(dir_model+'/termes.sav')
-        vocab = joblib.load(dir_model+'/vocab.sav')
-        f = open((dir_model+'/noms.txt'),"r")
+    if entrainement_bool == False:
 
-        noms_entrainement = list()
+        resultat_classification = classifier_corpus_modele_existant(dir_class,dir_mdl,pdf_bool)
+        matrice_documents_cluster = resultat_classification[2]
+        features_par_cluster = resultat_classification[1]
+        log = resultat_classification[0]
 
-        for lignes in f.readlines():
+        liste_noms = []
+        liste_index = []
+        
+        for f in features_par_cluster:
 
-            lignes.replace("\n","")
-            noms_entrainement.append(lignes[4:-1])
+            frame_clusters.insert(Tk.END,(str(f) + str(features_par_cluster[f])))
+        
+        for l in log:
 
-        f.close()
+            liste_noms.append(l)
+            liste_index.append(log[l])
 
-        labels_cl = modele.labels_.tolist()
-
-        noms = fichiers_cibles(dir_test)
-
-        a = 0
-        j = len(noms_entrainement)
-
-        for x in noms:
-
-            sp = os.path.split(x)
-
-            if sp[-1] in noms_entrainement:
-                a+=1
-            else:
-                break
-
-        if a == j :
-
-            txt_ = vectoriser_avec_noms(dir_test,vectoriseur,pdf)
-            noms = txt_[0]
-            txt_vec = txt_[1]
-            resultat_matrix = txt_[2]
-
-            resultat_class = list()
-
-            for i in range (0,len(noms)):
-                    
-                for texte in txt_vec:   
-                    
-                    resultat = modele.predict(texte)
-
-                resultat_class.append((noms[i],resultat[i]))
-
-        else :
-
-            txt_diff= vectoriser_avec_noms_diff(dir_test, vectoriseur,pdf)
-            noms = txt_diff[0]
-            txt_vec_diff= txt_diff[1]
-            resultat_matrix = txt_diff[2]
-
-            resultat_class = list()
-
-            for i in range (0,len(noms)):
-                    
-                for texte in txt_vec_diff:   
-                    
-                    resultat = modele.predict(texte)
-
-                resultat_class.append((noms[i],resultat[i]))
-
+            frame_resultats.insert(Tk.END,(str(l) + ' affecté au cluster N° '+ str(log[l])))
+        
     else:
 
-        entrainement = entrainer_depuis_corpus(dir_src,n,gpu,pdf)
-        modele = entrainement[0]
-        vectoriseur = entrainement[1]
-        vocab = entrainement[2]
-        noms_entrainement_originaux = entrainement[3]
+        resultat_classification = classifier_corpus_nouveau_modele(dir_class,nombre_clusters,gpu_bool,pdf_bool)
+        matrice_documents_cluster = resultat_classification[2]
+        features_par_cluster = resultat_classification[1]
+        log = resultat_classification[0]
 
-        noms_entrainement = list()
+        liste_noms = []
+        liste_index = []
+        
+        for f in features_par_cluster:
 
-        for y in noms_entrainement_originaux:
+            frame_clusters.insert(Tk.END,(str(f) + str(features_par_cluster[f])))
+        
+        for l in log:
 
-            noms_entrainement.append(y[4:])
+            liste_noms.append(l)
+            liste_index.append(log[l])
 
-        labels_cl = modele.labels_.tolist()
+            frame_resultats.insert(Tk.END,(str(l) + ' affecté au cluster N° '+ str(log[l])))
+    
+    graph = produire_graph_2d(matrice_documents_cluster,features_par_cluster,liste_index,liste_noms,nom_perso)
 
-        termes = vectoriseur.get_feature_names()
-
-        noms = fichiers_cibles(dir_test)
-
-        a = 0
-        j = len(noms_entrainement)
-
-        for x in noms:
-
-            sp = os.path.split(x)
-
-            if sp[-1] in noms_entrainement:
-                a+=1
-            else:
-                break
-
-        if a == j :
-
-            txt_ = vectoriser_avec_noms(dir_test,vectoriseur,pdf)
-            noms = txt_[0]
-            txt_vec = txt_[1]
-            resultat_matrix = txt_[2]
-
-            resultat_class = list()
-
-            for i in range (0,len(noms)):
-
-                for texte in txt_vec:
-                
-                    resultat = modele.predict(texte)
-
-                resultat_class.append((noms[i],resultat[i]))
-        else:
-
-            txt_diff= vectoriser_avec_noms_diff(dir_test, vectoriseur,pdf)
-            noms = txt_diff[0]
-            txt_vec_diff = txt_diff[1]
-            resultat_matrix = txt_diff[2]
-
-            resultat_class = list()
-
-            for i in range (0,len(noms)):
-
-                for texte in txt_vec_diff:
-                
-                    resultat = modele.predict(texte)
-
-                resultat_class.append((noms[i],resultat[i]))
-
-            
     t_1 = time.time()
 
-    delta_t = "effectué en " + str((t_1 - t_0))[:5] + " secondes."
-
-    return resultat_class , delta_t, modele, termes, vocab, resultat_matrix, labels_cl,noms
-
-
-def start(frame,bench,src,test,n,entrain,mdl,cl, gpu_bool,pdf_bool,nm):
-
-    pdf_bool = pdf_bool.get()
-
-    dir_test = test.cget("text")
-    dir_mdl = mdl.cget("text")
-    n_cl = int()
-    dir_src = str()
-    nom_perso = nm.get()
-    train = entrain.get()
-
-    if train == False:
-
-        n_cl = joblib.load(dir_mdl+'/nb_clust.sav') #Chargement du nombre de clusters du modèle préentraîné
-
-        result = tester_texte(dir_src,dir_test,n_cl,entrainer=False,dir_model=dir_mdl, gpu = gpu_bool,pdf = pdf_bool) #Prédiction sur le corpus de textes à classifier
-
-        result_clusters = clusters_en_features(result[2],n_cl,result[3],result[4]) #Extraction des 4 premières features par cluster
-
-        bench["text"] = str(result[1]) #Impression du temps d'exécution
-
-        #Impression des résultats des clusters selon le numéro du cluster
-
-        for key in result_clusters:
-
-            cl.insert(END,(str(key) + str(result_clusters[key])))
-
-        liste_index = []
-
-        for resultat in result[0]:
-
-            nom_indiv = os.path.split(str(resultat[0])) #Récupération du nom des documents
-
-            result_txt = nom_indiv[-1] + ' affecté au cluster N° '+ str(resultat[1])
-
-            frame.insert(END,result_txt) #Insertion des résultats dans l'interface
-
-            liste_index.append(resultat[1]) #Récupération du numéro du cluster pour chaque document
-
-        # Génération du graph HTML
-
-        graph = produire_graph_2d(result[5],result_clusters,liste_index,result[7],pdf_bool,nom_perso)
-
-        
-        
-    else:
-
-        n_cl = int(n.get())
-        dir_src = test.cget("text")
-
-        result = tester_texte(dir_src,dir_test,n_cl,entrainer=True,dir_model=dir_mdl,gpu = gpu_bool, pdf = pdf_bool)
-
-        result_clusters = clusters_en_features(result[2],n_cl,result[3],result[4])
-
-        bench["text"] = str(result[1])
-
-        for key in result_clusters:
-
-            cl.insert(END,(str(key) + str(result_clusters[key])))
-
-        liste_index = []
-
-        for resultat in result[0]:
-
-            nom_indiv = os.path.split(str(resultat[0]))
-
-            result_txt = nom_indiv[-1] + ' affecté au cluster N° '+ str(resultat[1])
-
-            frame.insert(END,result_txt)
-
-            liste_index.append(resultat[1])
-
-        graph = produire_graph_2d(result[5],result_clusters,liste_index,result[7],pdf_bool,nom_perso)
-
+    frame_bench["text"] = "effectué en " + str((t_1 - t_0))[:5] + " secondes."
     msg = 'Graph exporté sous :' + graph
 
-    frame.insert(END,' ')
-    frame.insert(END,msg)
+    frame_resultats.insert(Tk.END,' ')
+    frame_resultats.insert(Tk.END,msg)
 
-def clusters_en_features(mdl,n,termes,vocab):
+## Extraction des 4 principales features de chaque clusters dans un dictionnaire
 
-    order_centroids = mdl.cluster_centers_.argsort()[:, ::-1]
+def extraction_features(modele,nombre_clusters,termes,vocabulaire):
+
+    centroides = modele.cluster_centers_.argsort()[:, ::-1]
 
     blank =['',',']
     tm = []
@@ -771,36 +438,32 @@ def clusters_en_features(mdl,n,termes,vocab):
         if term not in blank:
             tm.append(term)
 
-    clusters_dict = dict()
+    clusters = dict()
 
-    for i in range(n):
+    for i in range(nombre_clusters):
 
         mots_par_clusters = []
 
-        for ind in order_centroids[i, :4]:
+        for ind in centroides[i, :4]:
 
             term_ind = tm[ind]
 
-            mot = (vocab.at[term_ind,'words'])[0]
+            mot = (vocabulaire.at[term_ind,'words'])[0]
             
             mots_par_clusters.append(mot)
 
-        clusters_dict['Cluster N° ' + str(i) +':'] = mots_par_clusters
+        clusters['Cluster N° ' + str(i) +':'] = mots_par_clusters
     
-    return clusters_dict
+    return clusters
 
 
-def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,pdf,nom):
 
-    nom_perso = nom
+## Génération d'un fichier HTML contenant la représentation graphique de la classification
 
-    ## DISTANCE COSINUS
+def produire_graph_2d(matrice_documents_cluster,features_par_cluster,liste_index,liste_noms,nom_perso):
 
-    distance = 1 - cosine_similarity(matrix)
 
-    ## REDUCTION MULTIDIMENSIONELLE VERS 2 DIMENSIONS
-
-    MDS()
+    distance = 1 - cosine_similarity(matrice_documents_cluster)
 
     mds = MDS(n_components=2, dissimilarity="precomputed", random_state=1)
 
@@ -814,7 +477,7 @@ def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,p
     i = 0
     palette = list()
 
-    for x in clusters_dict.values():
+    for x in features_par_cluster.values():
 
         nom = ', '.join(x)
         palette.append(generate_new_color(palette,pastel_factor = 0.5))
@@ -822,22 +485,6 @@ def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,p
         noms_clusters[i] = nom
         
         i += 1
-
-    noms_docs = list()
-
-    for titre in titres_docs_class:
-
-        if pdf == True:
-
-            nom_solo = (os.path.split(titre))[-1]
-
-            noms_docs.append(nom_solo[:-4])
-
-        else:
-
-            nom_solo = (os.path.split(titre))[-1]
-
-            noms_docs.append(nom_solo)
 
     class InteractiveLegendPluginTxt(mpld3.plugins.PluginBase):
 
@@ -1041,6 +688,7 @@ def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,p
         """
 
         css_ = """
+
         .legend-box {
         cursor: pointer;
         }
@@ -1115,8 +763,7 @@ def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,p
                 mpld3_element_ids.append(ids)
 
             return mpld3_element_ids
-
-    
+ 
     class PointHTMLTooltipC(mpld3.plugins.PluginBase):
     
         JAVASCRIPT = """
@@ -1227,7 +874,7 @@ def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,p
         height: auto;}
     """
 
-    df = pd.DataFrame(dict(x=xs, y=ys, label=labels_docs_class, titres=noms_docs))
+    df = pd.DataFrame(dict(x=xs, y=ys, label=liste_index, titres=liste_noms))
     df.sort_values(by=['label'])
 
     groupes = df.groupby('label')
@@ -1243,7 +890,6 @@ def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,p
     for nom, groupe in groupes:
 
         titres = []
-        pts = []
 
         for i in range(len(groupe)):
 
@@ -1267,33 +913,31 @@ def produire_graph_2d(matrix,clusters_dict,labels_docs_class,titres_docs_class,p
 
         tot.append(df.iat[i,3])
 
-    ##
-
     affichage_noms= PointHTMLTooltipC(po[0],tot,voffset=1, hoffset=1, css=css)
 
-    ilegend = InteractiveLegendPluginTxt(elem_points,titres_tot,titres_clust,alpha_unsel=0.0, alpha_over=1.2,start_visible=False)
+    legende_interactive= InteractiveLegendPluginTxt(elem_points,titres_tot,titres_clust,alpha_unsel=0.0, alpha_over=1.2,start_visible=False)
 
-    mpld3.plugins.connect(fig, affichage_noms,ilegend, TopToolbar())
+    mpld3.plugins.connect(fig, affichage_noms,legende_interactive, TopToolbar())
 
     plt.subplots_adjust(right=0.72)
 
     cd = 'GRAPH'
     t = str(datetime.datetime.now()).replace(':','_')
-    nm = os.path.join(cd, (nom_perso + ' ' + t[:-7] + '.html'))
+    chemin = os.path.join(cd, (nom_perso + ' ' + t[:-7] + '.html'))
 
     ax.set_title((nom_perso +  ' - ' + t[:-16]), size=20, y=0, x = 1.2)
 
-    mpld3.save_html(fig,nm)
+    mpld3.save_html(fig,chemin)
 
-    return nm
+    return chemin
 
 def afficher_graph(lst):
 
-    path = (lst.get(END).split(' :'))[1]
+    path = (lst.get(Tk.END).split(' :'))[1]
 
     webbrowser.open(path, new=2)
     
-
+'''
 def generer_gexf(df,couleurs_clusters, noms_clusters):
 
     df.sort_values('label')
@@ -1387,7 +1031,7 @@ def generer_gexf(df,couleurs_clusters, noms_clusters):
     file.close()
     
     return chm
-
+'''
 def chemin_dossier_src(r):
     dossier_source = filedialog.askdirectory(title="Choisir un dossier de données d'entraînement")
 
@@ -1409,7 +1053,7 @@ if os.environ.get('DISPLAY','') == '':
 
 ### GUI ###
 
-fen = Tk()
+fen = Tk.Tk()
 
 fen.title('NLPvs')
 fen.configure(background = '#232323')
@@ -1418,174 +1062,158 @@ fen.geometry('1100x900')
 fontdemarrer = tkFont.Font(family='Arial',size=50)
 fontcredits = tkFont.Font(family='Arial',size=8)
 
-frame_input = Frame(fen, borderwidth = 0, relief = FLAT, bg = '#232323')
-frame_input.pack(side = LEFT, padx = 20)
+frame_input = Tk.Frame(fen, borderwidth = 0, relief = Tk.FLAT, bg = '#232323')
+frame_input.pack(side = Tk.LEFT, padx = 20)
 
 
-ligne = Canvas(fen,bg= '#232323', height=700, borderwidth=0, width=50)
+ligne = Tk.Canvas(fen,bg= '#232323', height=700, borderwidth=0, width=50)
 ligne.create_line(25,25,25,675,width=2,fill='#e6e6e6')
 ligne.config(highlightthickness = 0, highlightbackground = "#232323", highlightcolor='#232323')
-ligne.pack(side=LEFT, padx=70)
+ligne.pack(side=Tk.LEFT, padx=70)
 
 
-frame_droite = Frame(fen, borderwidth = 0, relief = FLAT, bg = '#232323')
-frame_droite.pack(side=LEFT, padx=20)
+frame_droite = Tk.Frame(fen, borderwidth = 0, relief = Tk.FLAT, bg = '#232323')
+frame_droite.pack(side=Tk.LEFT, padx=20)
 
 log_o = Image.open('logo.png')
 log_o_md = log_o.resize((250, 83),Image.ANTIALIAS)
 logo = ImageTk.PhotoImage(log_o_md)
-logo_label = Label(frame_input, image=logo, bg = '#232323' )
+logo_label = Tk.Label(frame_input, image=logo, bg = '#232323' )
 logo_label.place(x=0,y=0)
 logo_label.pack(padx = 40)
 
-credit = Label(frame_input,text='par Vincent DUBOIS',fg='#e6e6e6', bg ='#232323',font=fontcredits)
+credit = Tk.Label(frame_input,text='par Vincent DUBOIS',fg='#e6e6e6', bg ='#232323',font=fontcredits)
 credit.pack()
 
-frame_2 = Frame(frame_droite, borderwidth = 0, relief = FLAT, bg = '#232323')
+frame_2 = Tk.Frame(frame_droite, borderwidth = 0, relief = Tk.FLAT, bg = '#232323')
 frame_2.pack(pady=20)
 
-frame_log = LabelFrame(frame_2, text = 'Documents clusterisés', borderwidth = 0, relief = FLAT, bg = '#232323')
+frame_log = Tk.LabelFrame(frame_2, text = 'Documents clusterisés', borderwidth = 0, relief = Tk.FLAT, bg = '#232323')
 frame_log.config(fg = '#E6E6E6', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
 frame_log.pack(padx = 0)
 
-frame_output = Listbox(frame_log, borderwidth = 0, bg = '#e6e6e6', fg = '#FF0000', width=300)
-frame_output.pack(fill = X, padx=0)
+frame_output = Tk.Listbox(frame_log, borderwidth = 0, bg = '#e6e6e6', fg = '#FF0000', width=300)
+frame_output.pack(fill = Tk.X, padx=0)
 
-frame_graph = Frame(frame_log, borderwidth=0, relief = FLAT, bg= '#e6e6e6')
-frame_graph.pack(fill=X)
+frame_graph = Tk.Frame(frame_log, borderwidth=0, relief = Tk.FLAT, bg= '#e6e6e6')
+frame_graph.pack(fill=Tk.X)
 
-btn_graph = Button(frame_graph, relief = GROOVE,text='Montrer le graph',bg='#e6e6e6', command=(lambda : afficher_graph(frame_output)))
+btn_graph = Tk.Button(frame_graph, relief = Tk.GROOVE,text='Montrer le graph',bg='#e6e6e6', command=(lambda : afficher_graph(frame_output)))
 btn_graph.config(fg='#232323')
 btn_graph.pack(pady=10)
 
-frame_cl = LabelFrame(frame_2, text = 'Clusters', borderwidth = 0, relief = FLAT, bg = '#232323')
+frame_cl = Tk.LabelFrame(frame_2, text = 'Clusters', borderwidth = 0, relief = Tk.FLAT, bg = '#232323')
 frame_cl.config(fg = '#E6E6E6', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
-frame_cl.pack(fill=X, pady = 20)
+frame_cl.pack(fill=Tk.X, pady = 20)
 
-cl_output = Listbox(frame_cl, borderwidth = 0, bg = '#e6e6e6', fg = '#FF0000',)
-cl_output.pack(fill=X,padx=0)
+cl_output = Tk.Listbox(frame_cl, borderwidth = 0, bg = '#e6e6e6', fg = '#FF0000',)
+cl_output.pack(fill=Tk.X,padx=0)
 
-bench_et_start = Frame(frame_2, relief = FLAT, bg = '#232323')
-bench_et_start.pack(fill=X, padx=0)
+bench_et_start = Tk.Frame(frame_2, relief = Tk.FLAT, bg = '#232323')
+bench_et_start.pack(fill=Tk.X, padx=0)
 
-bench = LabelFrame(bench_et_start,text = "Temps d'exécution",borderwidth = 0, relief = FLAT, bg = '#232323')
+bench = Tk.LabelFrame(bench_et_start,text = "Temps d'exécution",borderwidth = 0, relief = Tk.FLAT, bg = '#232323')
 bench.config(fg = '#E6E6E6', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
-bench.pack(pady=20, fill=X)
+bench.pack(pady=20, fill=Tk.X)
 
-bench_txt = Label(bench, text="", bg='#e6e6e6',borderwidth=0)
-bench_txt.pack(fill=X, padx=0, pady=0)
+bench_txt = Tk.Label(bench, text="", bg='#e6e6e6',borderwidth=0)
+bench_txt.pack(fill=Tk.X, padx=0, pady=0)
 
 #data à clusteriser
 
-dir_test = LabelFrame(frame_input, borderwidth=0, text='Dossier contenant les fichiers à classer', relief = FLAT, bg = '#232323')
+dir_test = Tk.LabelFrame(frame_input, borderwidth=0, text='Dossier contenant les fichiers à classer', relief = Tk.FLAT, bg = '#232323')
 dir_test.config(fg = '#E6E6E6', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
-dir_test.pack(fill=X, expand = 'yes', pady=20)
+dir_test.pack(fill=Tk.X, expand = 'yes', pady=20)
 
-frame_btn_test = Frame(dir_test, borderwidth=0, relief = FLAT, bg= '#e6e6e6')
-frame_btn_test.pack(fill=X)
+frame_btn_test = Tk.Frame(dir_test, borderwidth=0, relief = Tk.FLAT, bg= '#e6e6e6')
+frame_btn_test.pack(fill=Tk.X)
 
-btn_test = Button(frame_btn_test, relief = GROOVE,text='Sélectionner un dossier',bg='#e6e6e6', command=(lambda : chemin_dossier_test(r_test)))
+btn_test = Tk.Button(frame_btn_test, relief = Tk.GROOVE,text='Sélectionner un dossier',bg='#e6e6e6', command=(lambda : chemin_dossier_test(r_test)))
 btn_test.config(fg='#232323')
 btn_test.pack(pady=10)
 
-r_test = Label(frame_btn_test, text = "PDF", bg = '#e6e6e6')
-r_test.pack(fill=X, pady=10)
+r_test = Tk.Label(frame_btn_test, text = "PDF", bg = '#e6e6e6')
+r_test.pack(fill=Tk.X, pady=10)
 
 #choix type de fichier
 
-pdf = BooleanVar()
+pdf = Tk.BooleanVar()
 
-train_true = Radiobutton(frame_btn_test, text="PDF", variable=pdf, value=True,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
+train_true = Tk.Radiobutton(frame_btn_test, text="PDF", variable=pdf, value=True,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
 train_true.pack(pady=5)
-train_false = Radiobutton(frame_btn_test, text="HTML", variable=pdf, value=False,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
+train_false = Tk.Radiobutton(frame_btn_test, text="HTML", variable=pdf, value=False,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
 train_false.pack(pady=5)
 
 #selection du modele
 
-dir_mdl = LabelFrame(frame_input, borderwidth=0, text='Sélection du modèle de classification', relief = FLAT, bg = '#232323')
+dir_mdl = Tk.LabelFrame(frame_input, borderwidth=0, text='Sélection du modèle de classification', relief = Tk.FLAT, bg = '#232323')
 dir_mdl.config(fg = '#E6E6E6', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
-dir_mdl.pack(fill=X, expand = 'yes', pady=20)
+dir_mdl.pack(fill=Tk.X, expand = 'yes', pady=20)
 
-frame_btn_mdl = Frame(dir_mdl, borderwidth=0, relief = FLAT, bg= '#e6e6e6')
-frame_btn_mdl.pack(fill=X)
+frame_btn_mdl = Tk.Frame(dir_mdl, borderwidth=0, relief = Tk.FLAT, bg= '#e6e6e6')
+frame_btn_mdl.pack(fill=Tk.X)
 
-btn_mdl = Button(frame_btn_mdl, relief = GROOVE,text='Sélectionner un dossier',bg='#e6e6e6',command=(lambda : chemin_dossier_mdl(r_mdl)))
+btn_mdl = Tk.Button(frame_btn_mdl, relief = Tk.GROOVE,text='Sélectionner un dossier',bg='#e6e6e6',command=(lambda : chemin_dossier_mdl(r_mdl)))
 btn_mdl.config(fg='#232323')
 btn_mdl.pack(pady=10)
 
-r_mdl = Label(frame_btn_mdl, text = "MODEL/DEFAUT", bg = '#e6e6e6')
-r_mdl.pack(fill=X, pady=10)
+r_mdl = Tk.Label(frame_btn_mdl, text = "MODEL/DEFAUT", bg = '#e6e6e6')
+r_mdl.pack(fill=Tk.X, pady=10)
 
 #entrainement
 
-train = LabelFrame(frame_input, borderwidth=0, text='Entraîner un nouveau modèle', relief = FLAT, bg = '#232323')
+train = Tk.LabelFrame(frame_input, borderwidth=0, text='Entraîner un nouveau modèle', relief = Tk.FLAT, bg = '#232323')
 train.config(fg = '#E6E6E6', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
-train.pack(fill=X, expand = 'yes', pady=20)
+train.pack(fill=Tk.X, expand = 'yes', pady=20)
 
-frame_train = Frame(train, borderwidth=0, relief = FLAT, bg= '#e6e6e6')
-frame_train.pack(fill=X)
+frame_train = Tk.Frame(train, borderwidth=0, relief = Tk.FLAT, bg= '#e6e6e6')
+frame_train.pack(fill=Tk.X)
 
 #choix
-entrain = BooleanVar()
+entrain = Tk.BooleanVar()
 
-train_true = Radiobutton(frame_train, text="oui", variable=entrain, value=True,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
+train_true = Tk.Radiobutton(frame_train, text="oui", variable=entrain, value=True,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
 train_true.pack(pady=5)
-train_false = Radiobutton(frame_train, text="non", variable=entrain, value=False,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
+train_false = Tk.Radiobutton(frame_train, text="non", variable=entrain, value=False,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
 train_false.pack(pady=5)
 
 #choix gpu/cpu
-gpu = BooleanVar()
+gpu = Tk.BooleanVar()
 
-gpu_true = Radiobutton(frame_train, text="Accélération CUDA (GPU Nvidia requis)", variable=gpu, value=True,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
+gpu_true = Tk.Radiobutton(frame_train, text="Accélération CUDA (GPU Nvidia requis)", variable=gpu, value=True,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
 gpu_true.pack(pady=5)
-gpu_false = Radiobutton(frame_train, text="CPU", variable=gpu, value=False,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
+gpu_false = Tk.Radiobutton(frame_train, text="CPU", variable=gpu, value=False,bg= '#e6e6e6',fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
 gpu_false.pack(pady=5)
 
 #nombre de clusters
 
-clusters = LabelFrame(frame_train, borderwidth=0, text='Nombre de clusters', relief = SUNKEN, bg = '#e6e6e6')
+clusters = Tk.LabelFrame(frame_train, borderwidth=0, text='Nombre de clusters', relief = Tk.SUNKEN, bg = '#e6e6e6')
 clusters.config(fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
-clusters.pack(fill=X, expand = 'yes', pady=20)
+clusters.pack(fill=Tk.X, expand = 'yes', pady=20)
 
-n_clusters = Spinbox(clusters, from_=3, to=50, bg= "#e6e6e6",fg='#232323')
+n_clusters = Tk.Spinbox(clusters, from_=3, to=50, bg= "#e6e6e6",fg='#232323')
 n_clusters.pack(pady=10)
 
 #nom personnalisé
 
-nm = LabelFrame(frame_train, borderwidth=0, text='Nom personnalisé', relief = SUNKEN, bg = '#e6e6e6')
+nm = Tk.LabelFrame(frame_train, borderwidth=0, text='Nom personnalisé', relief = Tk.SUNKEN, bg = '#e6e6e6')
 nm.config(fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
-nm.pack(fill=X, expand = 'yes', pady=20)
+nm.pack(fill=Tk.X, expand = 'yes', pady=20)
 
-nm_entry = Entry(nm, bg= "#e6e6e6",fg='#232323')
+nm_entry = Tk.Entry(nm, bg= "#e6e6e6",fg='#232323')
 nm_entry.insert(30,'Classification')
-nm_entry.pack(fill=X, expand = 'yes', pady=10)
-
-#data d'entraînement (désactivé)
-'''
-dir_src= LabelFrame(frame_train, borderwidth=0, text="Dossier contenant les fichiers d'entraînement", relief = SUNKEN, bg = '#e6e6e6')
-dir_src.config(fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6", highlightcolor='#E6E6E6')
-dir_src.pack(fill=X, expand = 'yes', pady=20)
-
-btn_src = Button(dir_src,text='Sélectionner un dossier', relief = GROOVE,bg='#e6e6e6',command=(lambda :chemin_dossier_src(r_src)))
-btn_src.config(fg='#232323')
-btn_src.pack(pady=10)
-
-r_src = Label(dir_src, text = "PDF", bg = '#e6e6e6')
-'''
-r_src =  None
-#r_src.pack(fill=X, pady=10)
-
+nm_entry.pack(fill=Tk.X, expand = 'yes', pady=10)
 
 #démarrer 
 
-btn_start = Button(bench_et_start, text="Lancer la classification",height=3, bg = '#00C800',fg = '#E6E6E6', command=(lambda: start(frame_output, bench_txt, r_src, r_test, n_clusters, entrain=entrain, mdl = r_mdl, cl=cl_output, gpu_bool = gpu, pdf_bool=pdf,nm = nm_entry)))
+btn_start = Tk.Button(bench_et_start, text="Lancer la classification",height=3, bg = '#00C800',fg = '#E6E6E6', command=(lambda: main(frame_resultats=frame_output,frame_bench = bench_txt,frame_clusters=cl_output, dir_class= r_test, dir_mdl = r_mdl, nombre_clusters = n_clusters,nom_perso = nm_entry, entrainement_bool=entrain, gpu_bool = gpu, pdf_bool=pdf)))
 btn_start.config(highlightthickness = 1, highlightbackground='#009100', highlightcolor='#009100')
-btn_start.pack(pady= 20, fill=X)
+btn_start.pack(pady= 20, fill=Tk.X)
 
-quitter =  Frame(frame_droite, bg ='#232323', relief = FLAT)
-quitter.pack(side = BOTTOM, pady = 20)
+quitter =  Tk.Frame(frame_droite, bg ='#232323', relief = Tk.FLAT)
+quitter.pack(side = Tk.BOTTOM, pady = 20)
 
-btn_quitter = Button(quitter, text="Quitter", command=fen.quit, bg='#C80000', fg = '#E6E6E6')
+btn_quitter = Tk.Button(quitter, text="Quitter", command=fen.quit, bg='#C80000', fg = '#E6E6E6')
 btn_quitter.config(highlightthickness = 1, highlightbackground='#910000', highlightcolor='#910000')
 btn_quitter.pack()
 

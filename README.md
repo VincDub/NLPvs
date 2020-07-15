@@ -1,9 +1,13 @@
-# NLPvs (Dernière màj 10/07/2020)
+# NLPvs
 
 <h2>Description générale</h2>
 
 NLPvs est un outil de classification de documents contenants du texte (actuellement prévu pour des fichiers aux formats PDF et HTML) en combinant une analyse de proximité sémantique grâce à l'établissement d'une matrice Tf-idf, ainsi que l'algorithme de clustering Kmeans, outil de Machine Learning non-supervisé.
+
+<a href=log.md>Historique du développement</a>
+
 <img src="old_resources/schema.png"/>
+
  
 <h3>Fonctionnalités</h3>
 
