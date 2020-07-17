@@ -1,6 +1,21 @@
 # Historique d'NLPvs
 
-<h2>v2-alpha</h2>
+<h2>v2-alpha.2</h2>
+<h3>17/07/2020</h3>
+
+<ul>
+<li>Remplacement des opérateurs de la fonction <code>nettoyage</code> par des opérations regex (gain de performances)</li>
+<li>Ajout d'un rennomage automatique du fichier HTML en fonction de la quantité de documents classifiés
+<ul>
+<li>Si un seul document est détécté, le fichier de résultats prendra son nom</li>
+<li>Si plusieurs documents sont détéctés, le fichier de résultats prendra le nom du dossier dans lequel ils sont regroupés</li>
+</ul>
+</li>
+<li>Si un seul document est détécté, la classification est remplacée par une analyse individuelle du document dans la restitution graphique</li>
+</ul>
+
+
+<h2>v2-alpha.1</h2>
 <h3>15/07/2020</h3>
 
 <ul>
