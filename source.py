@@ -11,6 +11,7 @@ import sys
 import time
 import tkinter.font as tkFont
 import unicodedata
+import unidecode
 import webbrowser
 
 ## création d'interface graphique avec des widgets
@@ -106,12 +107,19 @@ def nettoyage(txt):
 
     for texte in txt:
         texte = "".join(texte.splitlines())
-        texte = unicodedata.normalize('NFD', texte).encode('utf-8', 'ignore').decode('utf-8', 'ignore')
         texte = texte.lower()
-        rm_ponctuation = str.maketrans(string.punctuation, " "*len(string.punctuation))
-        texte = texte.translate(rm_ponctuation)
-        texte = "".join([i for i in texte if not i.isdigit()]) ## SUPPRESSION DES CHIFFRES
         texte = re.sub(u'\u2019',u"\u0027", texte)
+        texte = re.sub(r'\s+https.+?\s+'," ", texte)
+        texte = re.sub(r'\s+.+?@.+?\s+'," ", texte)
+        texte = re.sub(r'\s+'," ", texte)
+        texte = re.sub(r'[0-9]'," ", texte)
+        texte = re.sub(r'\s\-+'," ", texte)
+        texte = re.sub(r'\-+\s'," ", texte)
+        texte = re.sub(r'\_',"", texte)
+        texte = re.sub(r'\d',"", texte)
+        pattern = re.compile(r'[\w+]|[\w\'\w+]|[\w\-\w+]|[\s]')
+        texte = pattern.findall(texte)
+        texte= "".join(texte)
         texte_clean.append(texte)
 
     return texte_clean
@@ -128,22 +136,34 @@ def tokenisation(txt):
 
         stop_words.append(ligne[:-1])
 
-    tk = [mot for mot in txt.split() if (len(mot)>3) and (mot not in stop_words)]
+    nombre_total_tokens = 0
+    tk = []
+
+    for mot in txt.split():
+
+        if (len(mot)>3) and (mot not in stop_words):
+
+            tk.append(mot)
+        
+        nombre_total_tokens += 1
 
     blank = ""
     texte_tk = [token for token in tk if (token not in blank)]
 
     stemmer=FrenchStemmer()
     texte_tk_racin = [stemmer.stem(token) for token in texte_tk]
+    
+    texte_tk_racin_sans_accents = [unidecode.unidecode(token) for token in texte_tk_racin]
+
 
     texte_tk_racin_regroup = ""
 
-    for n in texte_tk_racin:
+    for n in texte_tk_racin_sans_accents:
 
         a = ' ' + n
         texte_tk_racin_regroup += a
 
-    return texte_tk,texte_tk_racin,texte_tk_racin_regroup
+    return texte_tk,texte_tk_racin_sans_accents,texte_tk_racin_regroup,nombre_total_tokens
 
 
 ## Extraction du texte sous forme d'une chaîne de caractère par document à classer
@@ -358,9 +378,168 @@ def classifier_corpus_modele_existant(dir_class,dir_mdl,pdf_bool):
 
     return resultats_classification,clusters,matrice_corpus
 
+## Analyse plus en profondeur d'un document unique
+
+def classifier_document_solo(dir_class,pdf_bool):
+
+    if pdf_bool==True:
+
+        preprocess = extraction_texte_pdf(dir_class)
+    else:
+
+        preprocess = extraction_texte_html(dir_class)
+
+    print(preprocess)
+
+    texte_tk = tokenisation((preprocess[1])[0])
+
+    texte_tk_racin = texte_tk[1]
+    texte_tk_sans_racin = texte_tk[0]
+
+    vocabulaire = pd.DataFrame({'words': texte_tk_sans_racin}, index = texte_tk_racin)
+    
+    nom_fichier = os.path.split(preprocess[0][0])[-1]
+    if pdf_bool == True:
+
+        nom_fichier = nom_fichier[:-4]
+
+    else:
+
+        nom_fichier = nom_fichier[:-5]
+
+
+    nombre_tokens = texte_tk[3]
+
+    fdist = nltk.FreqDist(texte_tk_racin)
+    hapaxes_racin = fdist.hapaxes()
+    hapaxes = []
+
+    for hapax in hapaxes_racin:
+
+        hapax_sans_racin = vocabulaire.at[hapax,'words']
+        hapaxes.append(hapax_sans_racin)
+
+    indice_richesse_lexicale = len(fdist.keys())/nombre_tokens
+
+    mots_communs = fdist.most_common(20)
+    frequences = dict()
+
+    for mot in mots_communs:
+
+        mot=list(mot)
+
+        compte = mot[1]
+
+        mot_sans_racin = (vocabulaire.at[mot[0],'words'])[0]
+
+        frequences[mot_sans_racin] = compte
+    
+    print(nombre_tokens)
+    print(indice_richesse_lexicale)
+    print(len(hapaxes),hapaxes)
+    print(frequences)
+
+    ### GRAPH ###
+    
+    t = str(datetime.datetime.now()).replace(':','_')
+    fig = plt.figure(constrained_layout=True,figsize=(18,9))
+
+    gs = fig.add_gridspec(3,2)
+
+    ax1 = fig.add_subplot(gs[:,0])
+    ax2 = fig.add_subplot(gs[0,1])
+    ax3 = fig.add_subplot(gs[1,1])
+    ax4 = fig.add_subplot(gs[2,1])
+
+    largeur_barres = 0.5
+
+    ax1.barh(list(frequences.keys()),list(frequences.values()),height=largeur_barres)
+    ax1.set_xticks([])
+    ax1.set_yticks(list(frequences.keys()))
+    ax1.set_yticklabels(list(frequences.keys()))
+    ax1.set_title('Mots les plus fréquents', y=0)
+
+    for index,largeur in enumerate(list(frequences.values())):
+
+        ax1.text(largeur + 1, index, str(largeur),ha='center',va='center')
+
+    nombre_mots_repetes = nombre_tokens-len(hapaxes)
+
+    b1 = ax2.barh([0,0.5,1] , [0,nombre_mots_repetes,0],height=largeur_barres)
+    b2 = ax2.barh([0,0.5,1] ,[0,len(hapaxes),0],left=nombre_mots_repetes,height=largeur_barres)
+    ax2.set_xticks([0,nombre_tokens])
+    ax2.set_yticks([])
+    ax2.set_title('Nombre de mots', y=0)
+    ax2.legend((b1[0],b2[0]), ("Mots répétés","Hapaxes"))
+
+    ax2.text((nombre_mots_repetes/2),0.5,str(nombre_mots_repetes),ha='center',va='center')
+    ax2.text((nombre_mots_repetes+(len(hapaxes)/2)),0.5,str(len(hapaxes)),ha='center',va='center')
+
+    ax3.barh([0,0.5,1] ,[0,indice_richesse_lexicale,0],height=largeur_barres)
+    ax3.set_xticks([0,1])
+    ax3.set_yticks([])
+    ax3.set_title("Indice de richesse lexicale", y=0)
+
+    ax3.text((indice_richesse_lexicale/2),0.5,str(indice_richesse_lexicale)[:4],ha='center',va='center')
+
+    ax4.text(s=(nom_fichier +  ' - ' + t[:-16]), size=20, ha='center',va='center',x=0.5,y=0.5)
+    ax4.set_yticks([])
+    #ax4.set_title("Premiers hapaxes", y=-0.2)
+
+    chemin = os.path.join('GRAPH', (nom_fichier + ' ' + t[:-7] + '.html'))
+
+    css = '''
+
+    rect.mpld3-axesbg {
+
+        fill: rgb(245,245,245) !important;
+        border: 1px dotted gray!important;
+    }
+    g.mpld3-xaxis {
+        display:none;
+    }
+
+    g.tick > text {
+        font-family:Arial, Helvetica, sans-serif !important;
+        font-size:14px !important;
+    }
+
+    g.mpld3-paths > text {
+        font-family:Arial, Helvetica, sans-serif !important;
+        font-size:14px !important;
+    }
+
+    g.mpld3-paths > path.mpld3-path:hover {
+        fill-opacity : 1 !important ;
+        stroke-opacity : 1 !important;
+    }
+
+    g.mpld3-staticpaths > path:first-of-type {
+        display:none;
+    }
+
+    g.mpld3-yaxis > path {
+        stroke-width: 2;
+        stroke: rgba(0,0,0,0.5);
+    }
+
+    g.mpld3-baseaxes > text.mpld3-text {
+        font-weight: bold !important;
+        font-family:Arial, Helvetica, sans-serif !important;
+        font-size:16px !important;
+    }
+    '''
+
+    affichage = mpld3.plugins.PointHTMLTooltip(b1, [" "],voffset=1, hoffset=1, css=css)
+    mpld3.plugins.connect(fig,affichage)
+
+    mpld3.save_html(fig,chemin)
+
+    return chemin
+
 ## Fonction principale
 
-def main(frame_resultats,frame_bench,frame_clusters,dir_class,dir_mdl,nombre_clusters,nom_perso,entrainement_bool,gpu_bool,pdf_bool):
+def main(frame_resultats,frame_bench,frame_clusters,dir_class,dir_mdl,nombre_clusters,entrainement_bool,gpu_bool,pdf_bool):
 
     t_0 = time.time()
 
@@ -369,52 +548,61 @@ def main(frame_resultats,frame_bench,frame_clusters,dir_class,dir_mdl,nombre_clu
     dir_class = dir_class.cget("text")
     dir_mdl = dir_mdl.cget("text")
     nombre_clusters = int(nombre_clusters.get())
-    nom_perso = nom_perso.get()
     entrainement_bool = entrainement_bool.get()
 
-    if entrainement_bool == False:
+    documents = os.listdir(dir_class)
 
-        resultat_classification = classifier_corpus_modele_existant(dir_class,dir_mdl,pdf_bool)
-        matrice_documents_cluster = resultat_classification[2]
-        features_par_cluster = resultat_classification[1]
-        log = resultat_classification[0]
+    if len(documents) == 1:
 
-        liste_noms = []
-        liste_index = []
-        
-        for f in features_par_cluster:
+        graph = classifier_document_solo(dir_class,pdf_bool)
 
-            frame_clusters.insert(Tk.END,(str(f) + str(features_par_cluster[f])))
-        
-        for l in log:
-
-            liste_noms.append(l)
-            liste_index.append(log[l])
-
-            frame_resultats.insert(Tk.END,(str(l) + ' affecté au cluster N° '+ str(log[l])))
-        
     else:
 
-        resultat_classification = classifier_corpus_nouveau_modele(dir_class,nombre_clusters,gpu_bool,pdf_bool)
-        matrice_documents_cluster = resultat_classification[2]
-        features_par_cluster = resultat_classification[1]
-        log = resultat_classification[0]
+        nom_perso = (os.path.split(dir_class))[-1]
 
-        liste_noms = []
-        liste_index = []
-        
-        for f in features_par_cluster:
+        if entrainement_bool == False:
 
-            frame_clusters.insert(Tk.END,(str(f) + str(features_par_cluster[f])))
-        
-        for l in log:
+            resultat_classification = classifier_corpus_modele_existant(dir_class,dir_mdl,pdf_bool)
+            matrice_documents_cluster = resultat_classification[2]
+            features_par_cluster = resultat_classification[1]
+            log = resultat_classification[0]
 
-            liste_noms.append(l)
-            liste_index.append(log[l])
+            liste_noms = []
+            liste_index = []
+            
+            for f in features_par_cluster:
 
-            frame_resultats.insert(Tk.END,(str(l) + ' affecté au cluster N° '+ str(log[l])))
+                frame_clusters.insert(Tk.END,(str(f) + str(features_par_cluster[f])))
+            
+            for l in log:
+
+                liste_noms.append(l)
+                liste_index.append(log[l])
+
+                frame_resultats.insert(Tk.END,(str(l) + ' affecté au cluster N° '+ str(log[l])))
+            
+        else:
+
+            resultat_classification = classifier_corpus_nouveau_modele(dir_class,nombre_clusters,gpu_bool,pdf_bool)
+            matrice_documents_cluster = resultat_classification[2]
+            features_par_cluster = resultat_classification[1]
+            log = resultat_classification[0]
+
+            liste_noms = []
+            liste_index = []
+            
+            for f in features_par_cluster:
+
+                frame_clusters.insert(Tk.END,(str(f) + str(features_par_cluster[f])))
+            
+            for l in log:
+
+                liste_noms.append(l)
+                liste_index.append(log[l])
+
+                frame_resultats.insert(Tk.END,(str(l) + ' affecté au cluster N° '+ str(log[l])))
     
-    graph = produire_graph_2d(matrice_documents_cluster,features_par_cluster,liste_index,liste_noms,nom_perso)
+        graph = produire_graph_2d(matrice_documents_cluster,features_par_cluster,liste_index,liste_noms,nom_perso)
 
     t_1 = time.time()
 
@@ -1206,7 +1394,7 @@ nm_entry.pack(fill=Tk.X, expand = 'yes', pady=10)
 
 #démarrer 
 
-btn_start = Tk.Button(bench_et_start, text="Lancer la classification",height=3, bg = '#00C800',fg = '#E6E6E6', command=(lambda: main(frame_resultats=frame_output,frame_bench = bench_txt,frame_clusters=cl_output, dir_class= r_test, dir_mdl = r_mdl, nombre_clusters = n_clusters,nom_perso = nm_entry, entrainement_bool=entrain, gpu_bool = gpu, pdf_bool=pdf)))
+btn_start = Tk.Button(bench_et_start, text="Lancer la classification",height=3, bg = '#00C800',fg = '#E6E6E6', command=(lambda: main(frame_resultats=frame_output,frame_bench = bench_txt,frame_clusters=cl_output, dir_class= r_test, dir_mdl = r_mdl, nombre_clusters = n_clusters, entrainement_bool=entrain, gpu_bool = gpu, pdf_bool=pdf)))
 btn_start.config(highlightthickness = 1, highlightbackground='#009100', highlightcolor='#009100')
 btn_start.pack(pady= 20, fill=Tk.X)
 
