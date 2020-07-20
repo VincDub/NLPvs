@@ -13,6 +13,7 @@ import tkinter.font as tkFont
 import unicodedata
 import unidecode
 import webbrowser
+import difflib
 
 ## création d'interface graphique avec des widgets
 from tkinter import filedialog
@@ -40,8 +41,11 @@ from bs4 import BeautifulSoup
 import nltk
 from nltk.stem.snowball import FrenchStemmer
 
-## parsing des ficchiers PDF
+## parsing des fichiers PDF
 from pdfminer import high_level
+
+## Outil pour reconstruire la structure du PDF
+import pdfplumber
 
 ## sauvegarde et chargement des modèles de classification
 import joblib
@@ -106,16 +110,18 @@ def nettoyage(txt):
     texte_clean = list()
 
     for texte in txt:
-        texte = "".join(texte.splitlines())
+
         texte = texte.lower()
         texte = re.sub(u'\u2019',u"\u0027", texte)
-        texte = re.sub(r'\s+https.+?\s+'," ", texte)
+        texte = re.sub(r'\s+http+?\s+'," ", texte)
         texte = re.sub(r'\s+.+?@.+?\s+'," ", texte)
         texte = re.sub(r'\s+'," ", texte)
+
         texte = re.sub(r'[0-9]'," ", texte)
         texte = re.sub(r'\s\-+'," ", texte)
         texte = re.sub(r'\-+\s'," ", texte)
-        texte = re.sub(r'\_',"", texte)
+        texte = re.sub(r'\_'," ", texte)
+        texte = re.sub(r'\/'," ", texte)
         texte = re.sub(r'\d',"", texte)
         pattern = re.compile(r'[\w+]|[\w\'\w+]|[\w\-\w+]|[\s]')
         texte = pattern.findall(texte)
@@ -178,8 +184,71 @@ def extraction_texte_pdf(chemin):
     for nom in noms_fichiers:
 
         try:
-            textes_fichiers.append(high_level.extract_text(nom,"",None,0,True,'utf-8',None))
+
+            with pdfplumber.open(nom) as pdf:
+
+                pages_doc = pdf.pages
+                texte_vrac = str()
+                pages_suivantes_inutiles = False
+
+                for page in pages_doc:
+
+
+                    caracteres_page = pd.DataFrame.from_dict(page.chars)
+                    caracteres_page.sort_values(by=['size'])
+
+                    nb_caracteres = len(caracteres_page.index)
+
+                    if nb_caracteres < 200:
+                    
+                        continue
+
+                    if pages_suivantes_inutiles == True:
+
+                        break
+
+                    else:
+                        
+                        groupes_par_taille = caracteres_page.groupby('size',sort=False)
+
+                        nbr_car = list(groupes_par_taille.size())
+                        tailles = list(groupes_par_taille.groups.keys())
+
+                        valide = False
+                        
+                        for ind,groupe in groupes_par_taille:
+
+                            if len(groupe) > 7 and len(groupe) < 120:
+
+                                char = "".join(groupe['text'])
+                                char = char.lower()
+                                print(char)
+
+                                match_abstract = bool(re.search(r'abstract',char))
+                                match_ref = bool(re.search(r'bibliographie|iconographie|références|references|annexe',char))
+
+                                if match_ref == True:
+
+                                    pages_suivantes_inutiles = True
+                                    break
+
+
+                                elif match_abstract == True:
+                                    
+                                    break
+
+                                else:
+
+                                    valide = True
+                            
+                        if valide == True:
+                            
+                            texte_page = "".join(groupes_par_taille.get_group(tailles[0])['text'])
+                            texte_vrac += (" " + texte_page)           
+
+
             noms_fichiers_sortie.append(nom)
+            textes_fichiers.append(texte_vrac)
 
         except TypeError:
             
@@ -378,9 +447,10 @@ def classifier_corpus_modele_existant(dir_class,dir_mdl,pdf_bool):
 
     return resultats_classification,clusters,matrice_corpus
 
+
 ## Analyse plus en profondeur d'un document unique
 
-def classifier_document_solo(dir_class,pdf_bool):
+def classifier_document_solo(dir_class,pdf_bool,nom_classification):
 
     if pdf_bool==True:
 
@@ -389,7 +459,6 @@ def classifier_document_solo(dir_class,pdf_bool):
 
         preprocess = extraction_texte_html(dir_class)
 
-    print(preprocess)
 
     texte_tk = tokenisation((preprocess[1])[0])
 
@@ -399,25 +468,57 @@ def classifier_document_solo(dir_class,pdf_bool):
     vocabulaire = pd.DataFrame({'words': texte_tk_sans_racin}, index = texte_tk_racin)
     
     nom_fichier = os.path.split(preprocess[0][0])[-1]
-    if pdf_bool == True:
 
-        nom_fichier = nom_fichier[:-4]
+    if len(nom_classification) > 1:
+
+        nom_fichier = nom_classification
 
     else:
 
-        nom_fichier = nom_fichier[:-5]
+        if pdf_bool == True:
+
+            nom_fichier = nom_fichier[:-4]
+
+        else:
+
+            nom_fichier = nom_fichier[:-5]
 
 
     nombre_tokens = texte_tk[3]
 
     fdist = nltk.FreqDist(texte_tk_racin)
     hapaxes_racin = fdist.hapaxes()
+
     hapaxes = []
 
     for hapax in hapaxes_racin:
 
-        hapax_sans_racin = vocabulaire.at[hapax,'words']
-        hapaxes.append(hapax_sans_racin)
+        inclure = True
+        compteur_similaire = 0
+
+        for mot in texte_tk_racin:
+
+            matcher = difflib.SequenceMatcher(None,hapax,mot)
+            indice_simil = matcher.ratio()
+
+            if indice_simil > 0.7:
+
+                if compteur_similaire > 1:
+
+                    inclure = False
+                    break
+
+                else:
+
+                    compteur_similaire += 1
+
+
+        if inclure == True:
+   
+            hapax_sans_racin = vocabulaire.at[hapax,'words']
+            hapaxes.append(hapax_sans_racin)
+
+    print(hapaxes)
 
     indice_richesse_lexicale = len(fdist.keys())/nombre_tokens
 
@@ -433,11 +534,6 @@ def classifier_document_solo(dir_class,pdf_bool):
         mot_sans_racin = (vocabulaire.at[mot[0],'words'])[0]
 
         frequences[mot_sans_racin] = compte
-    
-    print(nombre_tokens)
-    print(indice_richesse_lexicale)
-    print(len(hapaxes),hapaxes)
-    print(frequences)
 
     ### GRAPH ###
     
@@ -539,7 +635,7 @@ def classifier_document_solo(dir_class,pdf_bool):
 
 ## Fonction principale
 
-def main(frame_resultats,frame_bench,frame_clusters,dir_class,dir_mdl,nombre_clusters,entrainement_bool,gpu_bool,pdf_bool):
+def main(frame_resultats,frame_bench,frame_clusters,dir_class,dir_mdl,nombre_clusters,entrainement_bool,gpu_bool,pdf_bool,nom_classification):
 
     t_0 = time.time()
 
@@ -549,16 +645,23 @@ def main(frame_resultats,frame_bench,frame_clusters,dir_class,dir_mdl,nombre_clu
     dir_mdl = dir_mdl.cget("text")
     nombre_clusters = int(nombre_clusters.get())
     entrainement_bool = entrainement_bool.get()
+    nom_classification = nom_classification.get()
 
     documents = os.listdir(dir_class)
 
     if len(documents) == 1:
 
-        graph = classifier_document_solo(dir_class,pdf_bool)
+        graph = classifier_document_solo(dir_class,pdf_bool,nom_classification)
 
     else:
+        
+        if len(nom_classification) > 1:
 
-        nom_perso = (os.path.split(dir_class))[-1]
+            nom_perso = nom_classification
+
+        else:
+
+            nom_perso = (os.path.split(dir_class))[-1]
 
         if entrainement_bool == False:
 
@@ -1389,12 +1492,12 @@ nm.config(fg = '#232323', highlightthickness = 1, highlightbackground = "#E6E6E6
 nm.pack(fill=Tk.X, expand = 'yes', pady=20)
 
 nm_entry = Tk.Entry(nm, bg= "#e6e6e6",fg='#232323')
-nm_entry.insert(30,'Classification')
+nm_entry.insert(30,'')
 nm_entry.pack(fill=Tk.X, expand = 'yes', pady=10)
 
 #démarrer 
 
-btn_start = Tk.Button(bench_et_start, text="Lancer la classification",height=3, bg = '#00C800',fg = '#E6E6E6', command=(lambda: main(frame_resultats=frame_output,frame_bench = bench_txt,frame_clusters=cl_output, dir_class= r_test, dir_mdl = r_mdl, nombre_clusters = n_clusters, entrainement_bool=entrain, gpu_bool = gpu, pdf_bool=pdf)))
+btn_start = Tk.Button(bench_et_start, text="Lancer la classification",height=3, bg = '#00C800',fg = '#E6E6E6', command=(lambda: main(frame_resultats=frame_output,frame_bench = bench_txt,frame_clusters=cl_output, dir_class= r_test, dir_mdl = r_mdl, nombre_clusters = n_clusters, entrainement_bool=entrain, gpu_bool = gpu, pdf_bool=pdf, nom_classification = nm_entry)))
 btn_start.config(highlightthickness = 1, highlightbackground='#009100', highlightcolor='#009100')
 btn_start.pack(pady= 20, fill=Tk.X)
 

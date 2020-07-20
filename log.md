@@ -1,5 +1,17 @@
 # Historique d'NLPvs
 
+
+<h2>v2-alpha.3</h2>
+<h3>20/07/2020</h3>
+
+<ul>
+<li>Remplacement du module <code>PDFminer</code> par <code>PDFplumber</code>, permettant d'avoir plus de données concernant les caractères parsés d'un fichier PDF</li>
+<li>Pour les fichiers PDF: Détection des titres et des corps de texte permettant la filtration des pages trop peu fournies (couvertures), des pages d'abstract ainsi que des pages de références bibliographiques/iconographiques/etc...en fin de document</li>
+<li>Filtration des "hapaxes" résiduels par comparaison avec le reste des tokens (légère réduction de performances)</li>
+<li>Rennomage personnalisé ré-activé : si l'utilisateur n'en indique aucun, le rennomage par défaut prend le relais</li>
+<ul>
+
+
 <h2>v2-alpha.2</h2>
 <h3>17/07/2020</h3>
 

@@ -3,8 +3,8 @@
 <h3>Environnement conseillé : Anaconda</h3>
 
 <ul style="list-style: none;">
-    <li>PDFMiner</li>
-    <code>pip install pdfminer.six</code>
+    <li>PDFplumber</li>
+    <code>pip install pdfplumber</code>
     <li></li>
     <li>NLTK</li>
     <code>conda install NLTK</code>
