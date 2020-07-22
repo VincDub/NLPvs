@@ -14,6 +14,9 @@ import unicodedata
 import unidecode
 import webbrowser
 import difflib
+import operator
+import math
+import decimal
 
 ## création d'interface graphique avec des widgets
 from tkinter import filedialog
@@ -40,9 +43,8 @@ from bs4 import BeautifulSoup
 ## fonction de racinisation pour le français
 import nltk
 from nltk.stem.snowball import FrenchStemmer
-
-## parsing des fichiers PDF
-from pdfminer import high_level
+from nltk.tag.stanford import StanfordPOSTagger
+from nltk.tokenize import  sent_tokenize
 
 ## Outil pour reconstruire la structure du PDF
 import pdfplumber
@@ -111,29 +113,57 @@ def nettoyage(txt):
 
     for texte in txt:
 
-        texte = texte.lower()
         texte = re.sub(u'\u2019',u"\u0027", texte)
-        texte = re.sub(r'\s+http+?\s+'," ", texte)
+        texte = re.sub(r'\shttp.+?\s'," ", texte)
         texte = re.sub(r'\s+.+?@.+?\s+'," ", texte)
-        texte = re.sub(r'\s+'," ", texte)
 
-        texte = re.sub(r'[0-9]'," ", texte)
+        texte= re.sub(r'^([^\w]+)\d', " ", texte)
+        texte = re.sub(r'\…'," ", texte)
+
         texte = re.sub(r'\s\-+'," ", texte)
         texte = re.sub(r'\-+\s'," ", texte)
         texte = re.sub(r'\_'," ", texte)
         texte = re.sub(r'\/'," ", texte)
-        texte = re.sub(r'\d',"", texte)
-        pattern = re.compile(r'[\w+]|[\w\'\w+]|[\w\-\w+]|[\s]')
-        texte = pattern.findall(texte)
-        texte= "".join(texte)
+        texte = re.sub(r'\-',"", texte)
+        texte = re.sub(r'\.{3,}'," ",texte)
+        texte = re.sub(r'\s+'," ", texte)
+
         texte_clean.append(texte)
 
     return texte_clean
 
 ## Tokenisation du texte nettoyé de chaque fichier à classer
 
-def tokenisation(txt):
+def tokenisation(txt): 
 
+    phrases = nltk.sent_tokenize(txt, language='french') # Reformation des phrases originelles par NLTK
+
+    # Au lieu d'utiliser un "tokenizer" classique, puis d'en filtrer les "stop-words", un "Post tagger" est utilisé
+    # Ce Post tagger regroupe dans une structure de donnée (ici : un Tuple) chaque token et sa fonction (nom propre, verbe, articles, etc...)
+
+    # Le Post tagger pré-entraîné dans plusieurs langues de l'Université de Stanford donne ici de très bons résultats, avec cependant un temps de processing qui peut être conséquent suivant la taille du fichier
+    # Il fournit ce genre de résultats assez qualitatifs et pleinement exploitables
+    # [('Seulement', 'ADV'), (',', 'PUNCT'), ('ces', 'DET'), ('méthodes', 'NOUN'), ('ont', 'VERB'), ('le', 'DET'), ('défaut', 'NOUN'), ('de', 'ADP'),
+    # ('reposer', 'VERB'), ('sur', 'ADP'), ('un', 'DET'), ('“', 'PUNCT'), ('seeding', 'NOUN'), ('”', 'PUNCT'), ('libre', 'ADJ')]
+
+    path_tagger = 'standfordtagger'
+    path_model = 'models'
+
+    pos_tagger = StanfordPOSTagger(os.path.join(path_tagger,os.path.join(path_model,"french-ud.tagger")),os.path.join(path_tagger,"stanford-postagger.jar"),encoding='utf8') #On charge le Post tagger français depuis un dossier local
+
+    sac_de_mots = []
+
+    # Ensemble de compteurs passés plus tard en sortie de fonction
+    total_mots = 0
+    total_verbes = 0
+    total_noms = 0
+    total_noms_propres = 0
+    total_adjectifs = 0
+
+    noms = []
+    noms_propres = []
+
+    # Recoupage de certaines termes avec une liste de stop-words externe locale
     stop_words = []
 
     f = open(('stopwordsfr.txt'),"r")
@@ -142,35 +172,51 @@ def tokenisation(txt):
 
         stop_words.append(ligne[:-1])
 
-    nombre_total_tokens = 0
-    tk = []
 
-    for mot in txt.split():
+    for p in phrases: # Itération à travers les phrases
 
-        if (len(mot)>3) and (mot not in stop_words):
+        tokens = nltk.word_tokenize(p,language = 'french') # Tokenisation des mots de la phrase grâce à NLTK
+        tags = pos_tagger.tag(tokens) #"Post tagging" de chaque token de la phrase
 
-            tk.append(mot)
+        print(tags)
         
-        nombre_total_tokens += 1
+        for t in tags:
 
-    blank = ""
-    texte_tk = [token for token in tk if (token not in blank)]
+            total_mots += 1 # compteur de mots passé en sortie de fonction
+            tk = t[0].lower() # uniformisation en minuscule du token
+            tk = re.sub(r'\w+\'',"",tk) # suppression des articles suivis d'apostrophes
 
-    stemmer=FrenchStemmer()
-    texte_tk_racin = [stemmer.stem(token) for token in texte_tk]
+            if t[1] =='NOUN' and len(tk) > 2 and tk not in stop_words: 
+
+                total_noms += 1
+                sac_de_mots.append(tk) # Si le mot est un nom, on l'intègre dans le sac de mots, et on incrément le compteur de noms
+                noms.append(tk)
+
+            elif t[1] =='VERB' and len(tk) > 2 and tk not in stop_words:
+                
+                total_verbes += 1
+                sac_de_mots.append(tk) # Si le mot est un verbe, on l'intègre dans le sac de mots, et on incrément le compteur de verbes
+
+            elif t[1] =='PROPN' and len(tk) > 2 and tk not in stop_words:
+
+                total_noms_propres += 1
+                sac_de_mots.append(tk) # Si le mot est un nom propre, on l'intègre dans le sac de mots, et on incrément le compteur de noms propres
+                noms_propres.append(tk) 
+                
+            elif t[1] =='ADJ' and len(tk) > 2 and tk not in stop_words:
+
+                total_adjectifs += 1
+                sac_de_mots.append(tk) # Si le mot est un adjectif, on l'intègre dans le sac de mots, et on incrément le compteur d'adjectifs
+
     
-    texte_tk_racin_sans_accents = [unidecode.unidecode(token) for token in texte_tk_racin]
+    stemmer=FrenchStemmer()
+    sac_de_mots_racin = [stemmer.stem(unidecode.unidecode(token)) for token in sac_de_mots] # Liste contenant une copie des tokens, soumis ensuite à une suppression des accents et une racinisation (pour la matrice TFIDF ou le compte des termes)
 
+    sac_de_mots_racin_regroup = " ".join(sac_de_mots_racin) # Liste contenant une copie des tokens regroupés dans une chaîne de caractères et séparés par des espaces
 
-    texte_tk_racin_regroup = ""
+    resultats = {'total mots' : total_mots,'total verbes' : total_verbes,'total noms' : total_noms,'total noms propres' : total_noms_propres, 'total adjectifs' : total_adjectifs} # regroupement des compteurs dans un dictionnaire
 
-    for n in texte_tk_racin_sans_accents:
-
-        a = ' ' + n
-        texte_tk_racin_regroup += a
-
-    return texte_tk,texte_tk_racin_sans_accents,texte_tk_racin_regroup,nombre_total_tokens
-
+    return sac_de_mots, sac_de_mots_racin, sac_de_mots_racin_regroup,resultats, noms, noms_propres
 
 ## Extraction du texte sous forme d'une chaîne de caractère par document à classer
 ## pour les fichiers PDF
@@ -183,76 +229,198 @@ def extraction_texte_pdf(chemin):
     
     for nom in noms_fichiers:
 
-        try:
+        # Ouverture du document PDF à partir de son nom
+        with pdfplumber.open(nom) as pdf:
 
-            with pdfplumber.open(nom) as pdf:
+                    # Extraction des pages grâce à PDFPlumber
+                    pages_doc = pdf.pages
 
-                pages_doc = pdf.pages
-                texte_vrac = str()
-                pages_suivantes_inutiles = False
+                    # Chaîne de caractère du document qui sera complétée au fur et à mesure de l'avancement dans les pages
+                    texte_vrac = str()
 
-                for page in pages_doc:
+                    pages_suivantes_inutiles = False
 
+                    for page in pages_doc:
 
-                    caracteres_page = pd.DataFrame.from_dict(page.chars)
-                    caracteres_page.sort_values(by=['size'])
+                        ### ETAPE 1 : ON VÉRIFIE QUE LA PAGE CONTIENT DU TEXTE (UTILE) ###
 
-                    nb_caracteres = len(caracteres_page.index)
+                        # Récupération de tous les caractères de chaque page dans une DataFrame
+                        # Chaque caractère dispose de données (Police, taille de police, largeur, distance des bords de page, etc...)
+                        caracteres_page = pd.DataFrame.from_dict(page.chars)
 
-                    if nb_caracteres < 200:
-                    
-                        continue
+                        # Tri de la dataframe selon la taille de police des caractères, de manière croissante
+                        caracteres_page.sort_values(by=['size'])
 
-                    if pages_suivantes_inutiles == True:
+                        nb_caracteres = len(caracteres_page.index) # Récupération du nombre de caractères total de la page
+                        largeur_page = page.width # Récupération de la largeur de la page (pour plus tard)
 
-                        break
-
-                    else:
+                        if nb_caracteres < 300: # Si la page contient moins de 300 caractères (couverture, page d'illustration, etc...), on passe à la suivante
                         
-                        groupes_par_taille = caracteres_page.groupby('size',sort=False)
+                            continue
 
-                        nbr_car = list(groupes_par_taille.size())
-                        tailles = list(groupes_par_taille.groups.keys())
+                        if pages_suivantes_inutiles == True: # Si on atteint une éventuelle partie bibliographie/références etc... à la fin d'un document, on sort de la boucle
+                            
+                            break
 
-                        valide = False
-                        
-                        for ind,groupe in groupes_par_taille:
-
-                            if len(groupe) > 7 and len(groupe) < 120:
-
-                                char = "".join(groupe['text'])
-                                char = char.lower()
-                                print(char)
-
-                                match_abstract = bool(re.search(r'abstract',char))
-                                match_ref = bool(re.search(r'bibliographie|iconographie|références|references|annexe',char))
-
-                                if match_ref == True:
-
-                                    pages_suivantes_inutiles = True
-                                    break
+                        else: # Si la page contient plus de 300 caractères et est située avant une éventuelle partie référence, On peut procéder aux autres analyses
 
 
-                                elif match_abstract == True:
+
+                            ### ETAPE 2 : ON CHERCHE À IDENTIFIER SI LA PAGE CONTIENT DES ENTETES, ET S'ILS INDIQUENT QUE LE TEXTE DE LA PAGE EST PEU OU PAS UTILE SÉMANTIQUEMENT ###
+
+
+                            
+                            # Division de la DataFrame en sous-groupes par taille de police
+                            # (Identification plus facile des blocs de texte)
+                            groupes_par_taille = caracteres_page.groupby('size',sort=False)
+
+
+                            nbr_caracteres = list(groupes_par_taille.size()) # Récupération de la longueur de chaque bloc en une liste
+                            tailles = list(groupes_par_taille.groups.keys()) # Récupération des différentes tailles de police en une liste
+                            
+                            # Création d'un dictionnaire à partir des deux listes
+                            # (Clé : nombre de caractères, Valeur : taille de police)
+                            nbr_caracteres_par_taille = dict(zip(nbr_caracteres, tailles))
+
+                            nbr_caracteres.sort() # Tri de la liste des longueurs des blocs par ordre croissant
+
+                            # Récupération de la taille de police correspondant au bloc de texte le plus long
+                            # nbr_caracteres[-1] : plus grande longuer de bloc
+                            # nbr_caracteres_par_taille[nbr_caracteres[-1]] : Récupération de la taille de police correspondante avec la longueur en tant que clé de dictionnaire
+                            taille_car_plus_gros_bloc = decimal.Decimal(nbr_caracteres_par_taille[nbr_caracteres[-1]])
+                            
+                            valide = False # Booléen pour définir si la page est valide en fonction de l'analyse des éventuels entêtes (Faux par défaut)
+                            nbr_caracteres_corps = 0 
+
+                            longueur_entete = 120 # Seuil de longueur pour la détéction des entêtes
+
+                            for n in nbr_caracteres: # Itérations à travers les longueurs de blocs
+                                
+                                if n >= longueur_entete: # Si le bloc n est plus long que le seuil de détéction d'entête
+
+                                    nbr_caracteres_corps += 1 # On incrémente cette variable temporaire de 1 
+
+
+                            # Si tous les blocs de la page sont plus long que le seuil de détéction d'entête
+                            if nbr_caracteres_corps == nbr_caracteres : 
+
+                                valide = True # Aucun entête : on valide l'analyse des entêtes par défaut
+                            
+                            else:
+
+                                for ind,groupe in groupes_par_taille: # Itération à travers les blocs de la page
+
+                                    if len(groupe) < longueur_entete: # Si le bloc actuel est en dessous du seuil de détéction d'entête
+
+                                        char = "".join(groupe['text']) # On regroupe chaque caractère du bloc en une chaîne de caractère
+                                        char = char.lower() # normalisation de la chaîne en minuscules
+
+                                        match_abstract = bool(re.search(r'abstract',char)) # Booléen pour détécter la présence du mot "abstract dans l'entête"
+                                        match_ref = bool(re.search(r'bibliographie|documentation|iconographie|références|references|annexe',char)) # Idem pour la détéction des mots "biblographie/références/etc..." 
+
+                                        if match_ref == True: # Si un entête correspondant à une partie "références"
+
+                                            pages_suivantes_inutiles = True # On assume que les pages suivantes sont inutiles pour une analyse sémantique (arrêt de l'extraction de texte)
+                                            break # Sortie de boucle
+
+
+                                        elif match_abstract == True: # Si un entête correspond à une partie "abstract"
+                                            
+                                            break # Sortie de boucle
+
+                                        else:
+
+                                            valide = True # On valide l'analyse des entêtes
+
+                            if valide == True: # Si l'analyse des entêtes est validée 
+
+                                ### ETAPE 3 : ON CHERCHE À DETECTER LES ÉVENTUELS SOMMAIRES/TABLES DES MATIÈRES, OU AUTRES PAGES INUTILES SÉMANTIQUEMENT AU SEIN DU BLOC DE TEXTE LE PLUS LONG ###
+
+                                # Analyse des caractères du bloc le plus long
+
+                                offsets_droite = list(groupes_par_taille.get_group(taille_car_plus_gros_bloc)['x1'].values) # Récupération de la distance de chaque caractère au bord gauche de la page
+                                liste_caracteres = list(groupes_par_taille.get_group(taille_car_plus_gros_bloc)['text'].values) # Récupération du contenu de chaque caractère
+                                largeur = list(groupes_par_taille.get_group(taille_car_plus_gros_bloc)['width'].values) # Récupération de la largeur de chaque caractère
+                                offsets_hauteur = list(groupes_par_taille.get_group(taille_car_plus_gros_bloc)['y1'].values) # Récupération de la distance de chaque caractère au bord inférieur de la page
+
+                                hauteurs_distinctes = list(set(offsets_hauteur)) # Extraction des différentes hauteurs de ligne (par l'analyse des différentes distances de chaque caractère par rapport au bas de la page)
+                                nombre_lignes = len(hauteurs_distinctes) # Déduction du nombre total de lignes
+
+                                quotient = decimal.Decimal(3/4)
+                                troisquart_page = largeur_page*quotient # Calcul des coordonnées minimales en abscisse pour détécter si un caractère se situe dans le quart droit de la page
+
+                                coords_x = [] 
+                                coords_y = []
+
+                                for i in range(len(liste_caracteres)): # Itération à travers les caractères du bloc
+
+                                    nbr = bool(re.search(r'[0-9]',liste_caracteres[i]))
+
+                                    if nbr == True and offsets_droite[i] > troisquart_page: # Si le caractère est un chiffre et est situé dans le quart droit de la page
+
+                                            coords_x.append(offsets_droite[i]) # Son abscisse (distance du bord gauche) est ajoutée à la liste coords_x
+                                            coords_y.append(offsets_hauteur[i]) # Son ordonnée (distance du bord inférieur) est ajoutée à la liste coords_y
+
+                                coords_y_distinctes = list(set(coords_y)) # Extraction des différentes hauteurs de ligne (par l'analyse des différentes distances de chaque chiffre situé dans le quart droit de la page par rapport au bas de la page)
+                                nombre_coords_y_d = len(coords_y_distinctes) # Déduction du nombre de lignes à laquelle apparaîssent les chiffres situés dans le quart droit de la page
+
+                                # S'il y a plus de 5 chiffres dans le quart droit de la page ET que ces chiffres occupent au moins la moitié des lignes de texte du bloc
+                                if len(coords_x) > 5 and (nombre_coords_y_d/nombre_lignes) > 0.5:
+                                            
+                                    variance = (np.std(coords_x)) # Un indice de variance est calculé pour évaluer l'écart entre les valeurs en abscisse des chiffres
                                     
-                                    break
+                                    # Si l'indice est faible, cela veut dire que les chiffres regroupés à droite de la page sur au moins la moitié des lignes
+                                    # sont TOUS ALIGNÉS VERTICALEMENT, ce qui est un indice prépondérant pour identifier une énumération de pages
+                                    # et donc un sommaire
 
-                                else:
+                                else :
 
-                                    valide = True
-                            
-                        if valide == True:
-                            
-                            texte_page = "".join(groupes_par_taille.get_group(tailles[0])['text'])
-                            texte_vrac += (" " + texte_page)           
+                                    variance = 99 # Dans les autres cas, une valeur élevée est donnée à la variable "variance"
+
+                                print(variance)
+
+                                if variance > 20: # Si l'indice de variance est au dessus d'un certain seuil (en dessous duquel la page est identifiée comme comprenant un sommaire)
+
+                                    texte = ""
+
+                                    ### ETAPE 4 : ON DÉTECTE LE TEXTE JUSTIFIÉ ET AUTRES MISES EN FORMES AVEC DES ESPACES NON-CONFORMES ###
+
+                                    for i in range(len(liste_caracteres)): # Itération à travers les caractères du bloc
+                                        
+                                        if i != len(liste_caracteres)-1:
+
+                                            x = round(offsets_droite[i],2) # Abscisse du caractère actuel
+                                            x_ = round(offsets_droite[i+1],2) # Abscisse du caractère suivant
+                                            
+                                            w_ = round(largeur[i+1],2) # Largeur du caractère suivant
+
+                                            dist = abs(x-x_) # Valeur absolue de la différence d'abscisse : distance entre les deux caractères
+
+                                            # Exemple : "AB" et "A  B"
+                                            # À gauche : la distance entre le même bord de chaque lettre correspond (à quelques décimales) près à la largeur de "B"
+                                            # À droite : la distance entre le même bord de chaque lettre est très éloignée de la largeur de "B"
+                                            # Ainsi, même s'il n'y a pas de caractère unicode correspondant à un espace entre deux caractères, on peut détecter la présence d'un espacement, et rajouter un espace en conséquence
+
+                                            # Si la différence entre la distance des deux caractères (actuel et suivant) et la largeur du caractère suivant est plus grande que 0.5 unités:
+                                            # (et si le caractère n'est pas déjà un espace)
+                                            if abs(dist - w_) > 0.5 and liste_caracteres[i] != " ":
+
+                                                texte += (liste_caracteres[i]+ " ") # On ajoute le caractère au sein d'une chaîne de caractère avec un espace
+                                            
+                                            else:
+
+                                                texte += liste_caracteres[i] # Sinon, on l'ajoute tel quel
+
+                                        else:
+
+                                           texte += liste_caracteres[i] # Ajout du dernier caractère du bloc qui ne peut être comparé au caractère suivant
+
+                                    texte_vrac += (" " + texte)
+                                    print(texte)           
 
 
-            noms_fichiers_sortie.append(nom)
-            textes_fichiers.append(texte_vrac)
-
-        except TypeError:
-            
-            print('la structure du fichier ' + nom + ' est invalide !')
+        noms_fichiers_sortie.append(nom) # Ajout du chemin du document dans une liste
+        textes_fichiers.append(texte_vrac) # Ajout de la chaîne de caractère unique de ce document dans une liste
 
     fichiers_clean = nettoyage(textes_fichiers)
 
@@ -455,6 +623,7 @@ def classifier_document_solo(dir_class,pdf_bool,nom_classification):
     if pdf_bool==True:
 
         preprocess = extraction_texte_pdf(dir_class)
+
     else:
 
         preprocess = extraction_texte_html(dir_class)
@@ -463,9 +632,12 @@ def classifier_document_solo(dir_class,pdf_bool,nom_classification):
     texte_tk = tokenisation((preprocess[1])[0])
 
     texte_tk_racin = texte_tk[1]
+
     texte_tk_sans_racin = texte_tk[0]
 
     vocabulaire = pd.DataFrame({'words': texte_tk_sans_racin}, index = texte_tk_racin)
+
+
     
     nom_fichier = os.path.split(preprocess[0][0])[-1]
 
@@ -484,7 +656,16 @@ def classifier_document_solo(dir_class,pdf_bool,nom_classification):
             nom_fichier = nom_fichier[:-5]
 
 
-    nombre_tokens = texte_tk[3]
+
+
+    resultats = texte_tk[3]
+
+    nombre_tokens = resultats['total mots']
+    nombre_noms_propres = resultats['total noms propres']
+
+
+    liste_noms = texte_tk[4]
+    liste_noms_propres = texte_tk[5]
 
     fdist = nltk.FreqDist(texte_tk_racin)
     hapaxes_racin = fdist.hapaxes()
@@ -493,29 +674,10 @@ def classifier_document_solo(dir_class,pdf_bool,nom_classification):
 
     for hapax in hapaxes_racin:
 
-        inclure = True
-        compteur_similaire = 0
+        hapax_sans_racin = vocabulaire.at[hapax,'words']
 
-        for mot in texte_tk_racin:
+        if hapax_sans_racin in liste_noms:
 
-            matcher = difflib.SequenceMatcher(None,hapax,mot)
-            indice_simil = matcher.ratio()
-
-            if indice_simil > 0.7:
-
-                if compteur_similaire > 1:
-
-                    inclure = False
-                    break
-
-                else:
-
-                    compteur_similaire += 1
-
-
-        if inclure == True:
-   
-            hapax_sans_racin = vocabulaire.at[hapax,'words']
             hapaxes.append(hapax_sans_racin)
 
     print(hapaxes)

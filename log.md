@@ -1,5 +1,15 @@
 # Historique d'NLPvs
 
+<h2>v2-alpha.4</h2>
+<h3>21/07/2020</h3>
+
+<ul>
+<li>Détéction et suppression plus efficace des sections peu utiles sémantiquement dans les fichiers PDF (sommaires/bibliographies/iconographies/etc...)</li>
+<li>Intégration du Post tagger de l'Université de Stanford, qui permet d'identifier la fonction de chaque token dans le texte</li>
+<li>Filtrage de tous les tokens aux fonctions non-utiles sémantiquement (articles/pronoms/adverbes) remplaçant le filtrage par "stop-words"</li>
+<li>Extraction d'hapaxes grandement améliorée</li>
+<ul>
+
 
 <h2>v2-alpha.3</h2>
 <h3>20/07/2020</h3>

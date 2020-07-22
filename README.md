@@ -14,7 +14,7 @@ NLPvs est un outil de classification de documents contenants du texte (actuellem
 <ul>
   <li>Permet la classification d'un corpus de documents PDF ou HTML, en spécifiant un nombre de clusters défini.</li>
   <li>Le résultat des différents clusters, leurs features ainsi que les documents qui leurs sont affectés se présenteront non seulement sous forme textuelle sur l'interface, mais surtout à travers une page html interactive, pour une meilleure lisibilité des résultats.</li>
-  <li>Cette page HTML étant suvegardée en local, il est possible de la partager et/ou de l'intégrer à un site web facilement</li>
+  <li>Cette page HTML étant sauvegardée en local, il est possible de la partager et/ou de l'intégrer à un site web facilement</li>
 </ul>
 
 <h3>Interface</h3>
