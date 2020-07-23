@@ -524,4 +524,8 @@ notamment
 quant
 quand
 sein
+foisci
+celleci
+cellesci
+ceuxci
 

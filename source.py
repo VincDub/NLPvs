@@ -122,7 +122,7 @@ def nettoyage(txt):
 
         texte = re.sub(r'\s\-+'," ", texte)
         texte = re.sub(r'\-+\s'," ", texte)
-        texte = re.sub(r'\_'," ", texte)
+        texte = re.sub(r'\_',"", texte)
         texte = re.sub(r'\/'," ", texte)
         texte = re.sub(r'\-',"", texte)
         texte = re.sub(r'\.{3,}'," ",texte)
@@ -178,36 +178,65 @@ def tokenisation(txt):
         tokens = nltk.word_tokenize(p,language = 'french') # Tokenisation des mots de la phrase grâce à NLTK
         tags = pos_tagger.tag(tokens) #"Post tagging" de chaque token de la phrase
 
-        print(tags)
+        decompte_chaine_nom_propre = 1
         
-        for t in tags:
+        for index,t in enumerate(tags):
 
-            total_mots += 1 # compteur de mots passé en sortie de fonction
-            tk = t[0].lower() # uniformisation en minuscule du token
-            tk = re.sub(r'\w+\'',"",tk) # suppression des articles suivis d'apostrophes
+            if decompte_chaine_nom_propre == 1:
 
-            if t[1] =='NOUN' and len(tk) > 2 and tk not in stop_words: 
+                total_mots += 1 # compteur de mots passé en sortie de fonction
+                tk = re.sub(r'\w+\'',"",t[0]) # suppression des articles suivis d'apostrophes
 
-                total_noms += 1
-                sac_de_mots.append(tk) # Si le mot est un nom, on l'intègre dans le sac de mots, et on incrément le compteur de noms
-                noms.append(tk)
+                if t[1] =='NOUN' and len(tk) > 2 and tk not in stop_words: 
 
-            elif t[1] =='VERB' and len(tk) > 2 and tk not in stop_words:
+                    total_noms += 1
+                    tk = tk.lower() # uniformisation en minuscule du token
+                    sac_de_mots.append(tk) # Si le mot est un nom, on l'intègre dans le sac de mots, et on incrément le compteur de noms
+                    noms.append(tk)
+
+                elif t[1] =='VERB' and len(tk) > 2 and tk not in stop_words:
+                    
+                    total_verbes += 1
+                    tk = tk.lower() # uniformisation en minuscule du token
+                    sac_de_mots.append(tk) # Si le mot est un verbe, on l'intègre dans le sac de mots, et on incrément le compteur de verbes
                 
-                total_verbes += 1
-                sac_de_mots.append(tk) # Si le mot est un verbe, on l'intègre dans le sac de mots, et on incrément le compteur de verbes
 
-            elif t[1] =='PROPN' and len(tk) > 2 and tk not in stop_words:
+                elif t[1] =='PROPN' and len(tk) > 2 and tk not in stop_words :
 
-                total_noms_propres += 1
-                sac_de_mots.append(tk) # Si le mot est un nom propre, on l'intègre dans le sac de mots, et on incrément le compteur de noms propres
-                noms_propres.append(tk) 
-                
-            elif t[1] =='ADJ' and len(tk) > 2 and tk not in stop_words:
+                    minuscule =  bool(re.search(r'^[^A-Z]+',tk))
 
-                total_adjectifs += 1
-                sac_de_mots.append(tk) # Si le mot est un adjectif, on l'intègre dans le sac de mots, et on incrément le compteur d'adjectifs
+                    if minuscule == False :
 
+                        if index != len(tags)-1:
+                            i = 1
+                            while tags[index+i][1] == 'PROPN':
+
+                                tk_suivant = re.sub(r'^[^A-Z]+',"",tags[index+i][0])
+                                tk += (" " + tk_suivant)
+                                i += 1
+                            
+                            decompte_chaine_nom_propre = i
+                            total_noms_propres += 1
+                            noms_propres.append(tk)
+                            tk = tk.lower() # uniformisation en minuscule du token
+                            sac_de_mots.append(tk) # Si le mot est un nom propre, on l'intègre dans le sac de mots, et on incrément le compteur de noms propres 
+                        
+                        else :
+
+                            total_noms_propres += 1
+                            noms_propres.append(tk)
+                            tk = tk.lower() # uniformisation en minuscule du token
+                            sac_de_mots.append(tk) # Si le mot est un nom propre, on l'intègre dans le sac de mots, et on incrément le compteur de noms propres 
+
+    
+                elif t[1] =='ADJ' and len(tk) > 2 and tk not in stop_words:
+
+                    total_adjectifs += 1
+                    tk = tk.lower() # uniformisation en minuscule du token
+                    sac_de_mots.append(tk) # Si le mot est un adjectif, on l'intègre dans le sac de mots, et on incrément le compteur d'adjectifs
+            else :
+
+                decompte_chaine_nom_propre -= 1
     
     stemmer=FrenchStemmer()
     sac_de_mots_racin = [stemmer.stem(unidecode.unidecode(token)) for token in sac_de_mots] # Liste contenant une copie des tokens, soumis ensuite à une suppression des accents et une racinisation (pour la matrice TFIDF ou le compte des termes)
@@ -377,8 +406,6 @@ def extraction_texte_pdf(chemin):
 
                                     variance = 99 # Dans les autres cas, une valeur élevée est donnée à la variable "variance"
 
-                                print(variance)
-
                                 if variance > 20: # Si l'indice de variance est au dessus d'un certain seuil (en dessous duquel la page est identifiée comme comprenant un sommaire)
 
                                     texte = ""
@@ -415,8 +442,7 @@ def extraction_texte_pdf(chemin):
 
                                            texte += liste_caracteres[i] # Ajout du dernier caractère du bloc qui ne peut être comparé au caractère suivant
 
-                                    texte_vrac += (" " + texte)
-                                    print(texte)           
+                                    texte_vrac += (" " + texte)         
 
 
         noms_fichiers_sortie.append(nom) # Ajout du chemin du document dans une liste
@@ -661,11 +687,23 @@ def classifier_document_solo(dir_class,pdf_bool,nom_classification):
     resultats = texte_tk[3]
 
     nombre_tokens = resultats['total mots']
-    nombre_noms_propres = resultats['total noms propres']
-
 
     liste_noms = texte_tk[4]
     liste_noms_propres = texte_tk[5]
+    liste_noms_propres = list(set(liste_noms_propres))
+
+    import langdetect
+
+    for np in liste_noms_propres:
+
+        np_r = np.lower()
+
+        if np_r in liste_noms or langdetect.detect(np_r) == 'fr' :
+
+            liste_noms_propres.remove(np)
+
+    nombre_noms_propres = len(liste_noms_propres)
+
 
     fdist = nltk.FreqDist(texte_tk_racin)
     hapaxes_racin = fdist.hapaxes()
@@ -700,49 +738,97 @@ def classifier_document_solo(dir_class,pdf_bool,nom_classification):
     ### GRAPH ###
     
     t = str(datetime.datetime.now()).replace(':','_')
-    fig = plt.figure(constrained_layout=True,figsize=(18,9))
+    fig = plt.figure(tight_layout=True,figsize=(18,9))
 
-    gs = fig.add_gridspec(3,2)
+    gs = fig.add_gridspec(6,3)
 
     ax1 = fig.add_subplot(gs[:,0])
-    ax2 = fig.add_subplot(gs[0,1])
-    ax3 = fig.add_subplot(gs[1,1])
-    ax4 = fig.add_subplot(gs[2,1])
+    ax2 = fig.add_subplot(gs[:,1])
+    ax3 = fig.add_subplot(gs[:2,2])
+    ax4 = fig.add_subplot(gs[2,2])
+    ax5 = fig.add_subplot(gs[3:,2])
 
     largeur_barres = 0.5
 
-    ax1.barh(list(frequences.keys()),list(frequences.values()),height=largeur_barres)
+    barre = ax1.barh(list(frequences.keys()),list(frequences.values()),height=largeur_barres)
     ax1.set_xticks([])
     ax1.set_yticks(list(frequences.keys()))
     ax1.set_yticklabels(list(frequences.keys()))
-    ax1.set_title('Mots les plus fréquents', y=0)
+    ax1.set_title('Mots les plus fréquents', y=-0.05)
 
     for index,largeur in enumerate(list(frequences.values())):
 
         ax1.text(largeur + 1, index, str(largeur),ha='center',va='center')
 
-    nombre_mots_repetes = nombre_tokens-len(hapaxes)
+    hapaxes_1 = hapaxes[:len(hapaxes)//3]
+    hapaxes_2 = hapaxes[len(hapaxes)//3:2*len(hapaxes)//3]
+    hapaxes_3 = hapaxes[2*len(hapaxes)//3:]
 
-    b1 = ax2.barh([0,0.5,1] , [0,nombre_mots_repetes,0],height=largeur_barres)
-    b2 = ax2.barh([0,0.5,1] ,[0,len(hapaxes),0],left=nombre_mots_repetes,height=largeur_barres)
-    ax2.set_xticks([0,nombre_tokens])
     ax2.set_yticks([])
-    ax2.set_title('Nombre de mots', y=0)
-    ax2.legend((b1[0],b2[0]), ("Mots répétés","Hapaxes"))
+    ax2.set_title('Hapaxes', y=-0.05)
 
-    ax2.text((nombre_mots_repetes/2),0.5,str(nombre_mots_repetes),ha='center',va='center')
-    ax2.text((nombre_mots_repetes+(len(hapaxes)/2)),0.5,str(len(hapaxes)),ha='center',va='center')
+    for index,hapax in enumerate(hapaxes_1):
 
-    ax3.barh([0,0.5,1] ,[0,indice_richesse_lexicale,0],height=largeur_barres)
-    ax3.set_xticks([0,1])
+        ax2.text(0.05, index/len(hapaxes_1)+0.01, str(hapax),ha='left',va='bottom')
+
+    for index,hapax in enumerate(hapaxes_2):
+
+        ax2.text(0.33, index/len(hapaxes_2)+0.01, str(hapax),ha='left',va='bottom')
+    
+    for index,hapax in enumerate(hapaxes_3):
+
+        ax2.text(0.66, index/len(hapaxes_3)+0.01, str(hapax),ha='left',va='bottom')
+
+
+    pc_nombre_tokens_repetes = (nombre_tokens-(len(hapaxes)+nombre_noms_propres))/nombre_tokens
+    pc_noms_propres = nombre_noms_propres/nombre_tokens
+    pc_hapaxes = len(hapaxes)/nombre_tokens
+
+    xplode = (0,0.1,0.1)
+    '''
+    b1 = ax3.barh([0,0.5,1] ,[0,nombre_mots_repetes,0],height=largeur_barres)
+    b2 = ax3.barh([0,0.5,1] ,[0,nombre_noms_propres,0],left=nombre_mots_repetes,height=largeur_barres)
+    b3 = ax3.barh([0,0.5,1] ,[0,len(hapaxes),0],left=nombre_mots_repetes_np,height=largeur_barres)
+    '''
+
+    pie = ax3.pie([pc_nombre_tokens_repetes,pc_noms_propres,pc_hapaxes],explode=xplode,frame=True,labels=[(nombre_tokens-(len(hapaxes)+nombre_noms_propres)),nombre_noms_propres,len(hapaxes)],radius=0.3)
+    cercle = plt.Circle((0,0),0.5,color='white', fc='white',linewidth=0)
+    ax3.axis('equal')
+    ax3.add_artist(cercle)
     ax3.set_yticks([])
-    ax3.set_title("Indice de richesse lexicale", y=0)
+    ax3.set_title('Nombre de mots', y=-0.15)
+    ax3.legend((pie[0][0],pie[0][1],pie[0][2]), ("Mots répétés","Noms propres","Hapaxes"))
 
-    ax3.text((indice_richesse_lexicale/2),0.5,str(indice_richesse_lexicale)[:4],ha='center',va='center')
+    '''
+    ax3.text((nombre_mots_repetes/2),0.5,str(nombre_mots_repetes),ha='center',va='center')
+    ax3.text((nombre_mots_repetes+(nombre_noms_propres/2)),0.5,str(nombre_noms_propres),ha='center',va='center')
+    ax3.text((nombre_mots_repetes_np+(len(hapaxes)/2)),0.5,str(len(hapaxes)),ha='center',va='center')
+    '''
 
-    ax4.text(s=(nom_fichier +  ' - ' + t[:-16]), size=20, ha='center',va='center',x=0.5,y=0.5)
+    ax4.barh([0,0.5,1] ,[0,indice_richesse_lexicale,0],height=largeur_barres)
+    ax4.set_xticks([0,1])
     ax4.set_yticks([])
-    #ax4.set_title("Premiers hapaxes", y=-0.2)
+    ax4.set_title("Indice de richesse lexicale", y=-0.35)
+
+    ax4.text((indice_richesse_lexicale/2),0.5,str(indice_richesse_lexicale)[:4],ha='center',va='center')
+
+    ax5.set_yticks([])
+    ax5.set_title('Noms propres mentionnés', y=-0.1)
+
+    np_1 = liste_noms_propres[:len(liste_noms_propres)//2]
+    np_2 = liste_noms_propres[len(liste_noms_propres)//2:]
+
+    for index,np in enumerate(np_1):
+
+       ax5.text(0.05, index/len(np_1)+0.02, str(np),ha='left',va='bottom')
+    
+    for index,np in enumerate(np_2):
+
+       ax5.text(0.5, index/len(np_2)+0.02, str(np),ha='left',va='bottom')
+    
+
+    #ax6.text(s=(nom_fichier +  ' - ' + t[:-16]), size=22, ha='center',va='center',x=0.5,y=0.5)
+    #ax6.set_yticks([])
 
     chemin = os.path.join('GRAPH', (nom_fichier + ' ' + t[:-7] + '.html'))
 
@@ -788,7 +874,7 @@ def classifier_document_solo(dir_class,pdf_bool,nom_classification):
     }
     '''
 
-    affichage = mpld3.plugins.PointHTMLTooltip(b1, [" "],voffset=1, hoffset=1, css=css)
+    affichage = mpld3.plugins.PointHTMLTooltip(barre, [" "],voffset=1, hoffset=1, css=css)
     mpld3.plugins.connect(fig,affichage)
 
     mpld3.save_html(fig,chemin)

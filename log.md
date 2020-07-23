@@ -1,7 +1,16 @@
 # Historique d'NLPvs
 
+<h2>v2-alpha.5</h2>
+<h3>23/07/2020</h3>
+
+<ul>
+<li>Intégration des hapaxes dans les résultats de l'analyse</li>
+<li>Intégration des noms communs présents dans le document dans les résultats de l'analyse </li>
+<ul>
+
+
 <h2>v2-alpha.4</h2>
-<h3>21/07/2020</h3>
+<h3>22/07/2020</h3>
 
 <ul>
 <li>Détéction et suppression plus efficace des sections peu utiles sémantiquement dans les fichiers PDF (sommaires/bibliographies/iconographies/etc...)</li>
