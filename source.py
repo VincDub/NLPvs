@@ -275,12 +275,19 @@ def extraction_texte_pdf(chemin):
 
                         # Récupération de tous les caractères de chaque page dans une DataFrame
                         # Chaque caractère dispose de données (Police, taille de police, largeur, distance des bords de page, etc...)
+
                         caracteres_page = pd.DataFrame.from_dict(page.chars)
 
                         # Tri de la dataframe selon la taille de police des caractères, de manière croissante
-                        caracteres_page.sort_values(by=['size'])
+                        try:
 
-                        nb_caracteres = len(caracteres_page.index) # Récupération du nombre de caractères total de la page
+                            caracteres_page.sort_values(by=['size'])
+                            nb_caracteres = len(caracteres_page.index) # Récupération du nombre de caractères total de la page
+
+                        except KeyError:
+                            
+                            nb_caracteres = 0
+
                         largeur_page = page.width # Récupération de la largeur de la page (pour plus tard)
 
                         if nb_caracteres < 300: # Si la page contient moins de 300 caractères (couverture, page d'illustration, etc...), on passe à la suivante
