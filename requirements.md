@@ -40,3 +40,5 @@
   <li>Visual Studio Code provoque un bug lors de
 l’importation du module Numpy à la date du 10/07/2020 sous Windows 10. Dans ce cas là, PyCharm est une solide alternative</li>
 </ul>
+
+<h3>/!\ L'installation de Java est requise pour le Post-tagger</h3>

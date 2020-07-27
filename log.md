@@ -1,5 +1,14 @@
 # Historique d'NLPvs
 
+
+<h2>v2-alpha.6</h2>
+<h3>27/07/2020</h3>
+
+<ul>
+<li>Ajout d'une barre de scrolling dans les sections "hapaxes" et "noms-propres"</li>
+<ul>
+
+
 <h2>v2-alpha.5</h2>
 <h3>23/07/2020</h3>
 
