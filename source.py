@@ -743,7 +743,109 @@ def classifier_document_solo(dir_class,pdf_bool,nom_classification):
         frequences[mot_sans_racin] = compte
 
     ### GRAPH ###
+    class TexteScroll(mpld3.plugins.PluginBase): 
     
+        JAVASCRIPT = """
+        mpld3.register_plugin("textescroll",TexteScroll);
+        TexteScroll.prototype = Object.create(mpld3.Plugin.prototype);
+        TexteScroll.prototype.constructor = TexteScroll;
+        TexteScroll.prototype.requiredProps = ["texte","ax"];
+
+        function TexteScroll(fig, props){
+            mpld3.Plugin.call(this, fig, props);
+        };
+        
+        TexteScroll.prototype.draw = function(){
+            var texte_ = this.props.texte;
+            texte_ = texte_[0]
+            var ax = this.props.ax;
+            ax = ax[0];
+
+            console.log(d3.select("body"));
+
+            var axes = document.getElementsByClassName("mpld3-axesbg");
+            console.log(axes[ax]);
+            console.log(texte_);
+            var coord = (axes[ax]).getBoundingClientRect();
+
+            var txt_ = (d3.select("body")).append("div")
+                .attr("class","scrolltext")
+                .style("position", "absolute")
+                .style("z-index", "10")
+                .style("width", coord.width+ "px")
+                .style("height", coord.height+ "px")
+                .style("top", coord.top + "px")
+                .style("left", coord.left + "px");
+
+            txt_.html(texte_);
+
+        };
+        """
+
+        def __init__(self,texte,ax,css=None):
+
+            self.css_ = css or ""
+            self.texte = texte
+            self.ax = ax
+            self.dict_ = {"type":"textescroll","texte" : texte,"ax": ax}
+
+    css = '''
+
+        rect.mpld3-axesbg {
+
+            fill: rgb(245,245,245) !important;
+            border: 1px dotted gray !important;
+        }
+
+        g.mpld3-xaxis {
+            display:none;
+        }
+
+        g.tick > text {
+            font-family:Arial, Helvetica, sans-serif !important;
+            font-size:14px !important;
+        }
+
+        g.mpld3-paths > text {
+            font-family:Arial, Helvetica, sans-serif !important;
+            font-size:14px !important;
+            white-space: pre-line !important;
+            overflow-y: scroll !important;
+        }
+
+        .scrolltext {
+            font-family:Arial, Helvetica, sans-serif !important;
+            font-size:16px !important;
+            white-space: pre-line !important;
+            overflow-y: scroll !important;
+            scrollbar-color: rgb(31, 119, 180) rgba(122,122,122,0.2) !important;
+            scrollbar-width: thin !important;
+            text-align: center;
+        }
+
+        g.mpld3-paths > path.mpld3-path:hover {
+            fill-opacity : 1 !important ;
+            stroke-opacity : 1 !important;
+        }
+
+        
+        g.mpld3-staticpaths > path:first-of-type {
+            display:none;
+        }
+
+        g.mpld3-yaxis > path {
+            stroke-width: 2;
+            stroke: rgba(0,0,0,0.5);
+        }
+
+        g.mpld3-baseaxes > text.mpld3-text {
+            font-weight: bold !important;
+            font-family:Arial, Helvetica, sans-serif !important;
+            font-size:16px !important;
+        }
+    
+    '''
+
     t = str(datetime.datetime.now()).replace(':','_')
     fig = plt.figure(tight_layout=True,figsize=(18,9))
 
@@ -757,7 +859,7 @@ def classifier_document_solo(dir_class,pdf_bool,nom_classification):
 
     largeur_barres = 0.5
 
-    barre = ax1.barh(list(frequences.keys()),list(frequences.values()),height=largeur_barres)
+    ax1.barh(list(frequences.keys()),list(frequences.values()),height=largeur_barres)
     ax1.set_xticks([])
     ax1.set_yticks(list(frequences.keys()))
     ax1.set_yticklabels(list(frequences.keys()))
@@ -767,36 +869,18 @@ def classifier_document_solo(dir_class,pdf_bool,nom_classification):
 
         ax1.text(largeur + 1, index, str(largeur),ha='center',va='center')
 
-    hapaxes_1 = hapaxes[:len(hapaxes)//3]
-    hapaxes_2 = hapaxes[len(hapaxes)//3:2*len(hapaxes)//3]
-    hapaxes_3 = hapaxes[2*len(hapaxes)//3:]
-
     ax2.set_yticks([])
     ax2.set_title('Hapaxes', y=-0.05)
 
-    for index,hapax in enumerate(hapaxes_1):
+    texte_reuni_h = "\n".join(hapaxes)
 
-        ax2.text(0.05, index/len(hapaxes_1)+0.01, str(hapax),ha='left',va='bottom')
-
-    for index,hapax in enumerate(hapaxes_2):
-
-        ax2.text(0.33, index/len(hapaxes_2)+0.01, str(hapax),ha='left',va='bottom')
-    
-    for index,hapax in enumerate(hapaxes_3):
-
-        ax2.text(0.66, index/len(hapaxes_3)+0.01, str(hapax),ha='left',va='bottom')
-
+    texte_hapaxes = TexteScroll([texte_reuni_h],[1],css=css)
 
     pc_nombre_tokens_repetes = (nombre_tokens-(len(hapaxes)+nombre_noms_propres))/nombre_tokens
     pc_noms_propres = nombre_noms_propres/nombre_tokens
     pc_hapaxes = len(hapaxes)/nombre_tokens
 
     xplode = (0,0.1,0.1)
-    '''
-    b1 = ax3.barh([0,0.5,1] ,[0,nombre_mots_repetes,0],height=largeur_barres)
-    b2 = ax3.barh([0,0.5,1] ,[0,nombre_noms_propres,0],left=nombre_mots_repetes,height=largeur_barres)
-    b3 = ax3.barh([0,0.5,1] ,[0,len(hapaxes),0],left=nombre_mots_repetes_np,height=largeur_barres)
-    '''
 
     pie = ax3.pie([pc_nombre_tokens_repetes,pc_noms_propres,pc_hapaxes],explode=xplode,frame=True,labels=[(nombre_tokens-(len(hapaxes)+nombre_noms_propres)),nombre_noms_propres,len(hapaxes)],radius=0.3)
     cercle = plt.Circle((0,0),0.5,color='white', fc='white',linewidth=0)
@@ -806,11 +890,6 @@ def classifier_document_solo(dir_class,pdf_bool,nom_classification):
     ax3.set_title('Nombre de mots', y=-0.15)
     ax3.legend((pie[0][0],pie[0][1],pie[0][2]), ("Mots répétés","Noms propres","Hapaxes"))
 
-    '''
-    ax3.text((nombre_mots_repetes/2),0.5,str(nombre_mots_repetes),ha='center',va='center')
-    ax3.text((nombre_mots_repetes+(nombre_noms_propres/2)),0.5,str(nombre_noms_propres),ha='center',va='center')
-    ax3.text((nombre_mots_repetes_np+(len(hapaxes)/2)),0.5,str(len(hapaxes)),ha='center',va='center')
-    '''
 
     ax4.barh([0,0.5,1] ,[0,indice_richesse_lexicale,0],height=largeur_barres)
     ax4.set_xticks([0,1])
@@ -822,67 +901,15 @@ def classifier_document_solo(dir_class,pdf_bool,nom_classification):
     ax5.set_yticks([])
     ax5.set_title('Noms propres mentionnés', y=-0.1)
 
-    np_1 = liste_noms_propres[:len(liste_noms_propres)//2]
-    np_2 = liste_noms_propres[len(liste_noms_propres)//2:]
-
-    for index,np in enumerate(np_1):
-
-       ax5.text(0.05, index/len(np_1)+0.02, str(np),ha='left',va='bottom')
-    
-    for index,np in enumerate(np_2):
-
-       ax5.text(0.5, index/len(np_2)+0.02, str(np),ha='left',va='bottom')
-    
+    texte_reuni_np = "\n".join(liste_noms_propres)
+    texte_noms_propre = TexteScroll([texte_reuni_np],[4])
 
     #ax6.text(s=(nom_fichier +  ' - ' + t[:-16]), size=22, ha='center',va='center',x=0.5,y=0.5)
     #ax6.set_yticks([])
 
     chemin = os.path.join('GRAPH', (nom_fichier + ' ' + t[:-7] + '.html'))
 
-    css = '''
-
-    rect.mpld3-axesbg {
-
-        fill: rgb(245,245,245) !important;
-        border: 1px dotted gray!important;
-    }
-    g.mpld3-xaxis {
-        display:none;
-    }
-
-    g.tick > text {
-        font-family:Arial, Helvetica, sans-serif !important;
-        font-size:14px !important;
-    }
-
-    g.mpld3-paths > text {
-        font-family:Arial, Helvetica, sans-serif !important;
-        font-size:14px !important;
-    }
-
-    g.mpld3-paths > path.mpld3-path:hover {
-        fill-opacity : 1 !important ;
-        stroke-opacity : 1 !important;
-    }
-
-    g.mpld3-staticpaths > path:first-of-type {
-        display:none;
-    }
-
-    g.mpld3-yaxis > path {
-        stroke-width: 2;
-        stroke: rgba(0,0,0,0.5);
-    }
-
-    g.mpld3-baseaxes > text.mpld3-text {
-        font-weight: bold !important;
-        font-family:Arial, Helvetica, sans-serif !important;
-        font-size:16px !important;
-    }
-    '''
-
-    affichage = mpld3.plugins.PointHTMLTooltip(barre, [" "],voffset=1, hoffset=1, css=css)
-    mpld3.plugins.connect(fig,affichage)
+    mpld3.plugins.connect(fig,texte_hapaxes,texte_noms_propre)
 
     mpld3.save_html(fig,chemin)
 
@@ -1152,8 +1179,8 @@ def produire_graph_2d(matrice_documents_cluster,features_par_cluster,liste_index
                         .style("position", "absolute")
                         .style("z-index", "10")
                         .style("visibility", "visible")
-                        .style("top", coord.top + "px")
-                        .style("left", coord.left + "px");
+                        .attr("top", coord.top + "px")
+                        .attr("left", coord.left + "px");
 
                     tooltip.html(texte[j])
                         .style("visibility", "visible");
